@@ -1,0 +1,392 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>RNN, Step by Step</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: control bar, unrolled RNN diagram across the full width, then narration beside the live math of the active cell */
+:root{
+  --bg:#f4f6f9; --surface:#ffffff; --ink:#172031; --muted:#5a6578; --line:#d8dee8; --faint:#eef1f6;
+  --input:#c9701c; --memory:#6a4fc4; --output:#2a66cf;
+  --pos:#0f7a68; --neg:#bf3f45; --ok:#1d7a3e;
+  --font-display:"Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body:"Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10141c; --surface:#171d28; --ink:#e7ebf2; --muted:#9aa4b5; --line:#2c3545; --faint:#1d2431;
+  --input:#e8954a; --memory:#a58cf2; --output:#6e9df0;
+  --pos:#3cc4a6; --neg:#f07a80; --ok:#5cc983; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10141c; --surface:#171d28; --ink:#e7ebf2; --muted:#9aa4b5; --line:#2c3545; --faint:#1d2431;
+  --input:#e8954a; --memory:#a58cf2; --output:#6e9df0;
+  --pos:#3cc4a6; --neg:#f07a80; --ok:#5cc983; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 48px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  display:grid;gap:18px}
+header h1{font-family:var(--font-display);font-size:clamp(1.6rem,3.2vw,2.2rem);font-weight:700;letter-spacing:-.01em;margin:0;text-wrap:balance}
+header p{margin:6px 0 0;color:var(--muted);max-width:68ch}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:10px;font-size:.85rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:3px;border:2px solid currentColor;display:inline-block}
+
+/* controls */
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+button{font:inherit;color:var(--ink);background:var(--faint);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+button:hover{border-color:var(--muted)}
+button:focus-visible,select:focus-visible{outline:2px solid var(--output);outline-offset:2px}
+button.primary{background:var(--ink);color:var(--surface);border-color:var(--ink);min-width:92px;justify-content:center}
+button:disabled{opacity:.4;cursor:default}
+select{font:inherit;color:var(--ink);background:var(--faint);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.count{font-family:var(--font-mono);font-size:.82rem;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+.track{flex-basis:100%;display:flex;gap:3px;align-items:center}
+.track i{flex:1;height:8px;border-radius:2px;background:var(--line);cursor:pointer;border:0}
+.track i.done{background:color-mix(in srgb,var(--ink) 45%,var(--line))}
+.track i.now{background:var(--output);height:12px}
+.track i.gap{flex:0 0 6px;background:none;cursor:default}
+
+/* diagram */
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+.stage svg{display:block;min-width:680px;width:100%;height:auto}
+svg text{font-family:var(--font-body);fill:var(--ink)}
+svg .mono{font-family:var(--font-mono)}
+svg .muted{fill:var(--muted)}
+.box{fill:var(--surface);stroke:var(--line);stroke-width:2;transition:stroke .3s, fill .3s, opacity .3s}
+.col{transition:opacity .35s}
+.col.future{opacity:.35}
+.col .in.box{stroke:var(--input)}
+.col .cell.box{stroke:var(--memory)}
+.col .out.box{stroke:var(--output)}
+.col.active .cell.box{fill:color-mix(in srgb,var(--memory) 10%,var(--surface));stroke-width:3.5}
+.col.lit-in .in.box{fill:color-mix(in srgb,var(--input) 16%,var(--surface));stroke-width:3.5}
+.col.lit-out .out.box{fill:color-mix(in srgb,var(--output) 14%,var(--surface));stroke-width:3.5}
+.col.alt .out.box{stroke-dasharray:6 5}
+.edge{stroke:var(--line);stroke-width:3;fill:none;transition:stroke .3s}
+.edge.done{stroke:color-mix(in srgb,var(--ink) 40%,var(--line))}
+.edge.on{stroke-dasharray:10 8;animation:flow .9s linear infinite}
+.edge.on.e-in{stroke:var(--input)} .edge.on.e-h{stroke:var(--memory)} .edge.on.e-out{stroke:var(--output)}
+.edge.cut{stroke:var(--neg);stroke-dasharray:4 6}
+@keyframes flow{to{stroke-dashoffset:-18}}
+.hcell{transition:fill .4s}
+.colhit{fill:transparent;cursor:pointer}
+
+/* panels */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 18px 20px;min-width:0}
+.tag{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.narr h2{font-family:var(--font-display);font-size:1.35rem;margin:6px 0 10px;line-height:1.25;text-wrap:balance}
+.narr p{margin:0 0 10px;max-width:62ch}
+.narr .note{font-size:.88rem;color:var(--muted);border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
+.w{font-family:var(--font-mono);font-size:.92em;background:var(--faint);border:1px solid var(--line);border-radius:5px;padding:0 5px;white-space:nowrap}
+.c-in{color:var(--input);font-weight:600}.c-h{color:var(--memory);font-weight:600}.c-out{color:var(--output);font-weight:600}
+
+.formula{font-family:var(--font-mono);font-size:.95rem;display:grid;gap:4px;padding:12px;background:var(--faint);border-radius:8px;overflow-x:auto;white-space:nowrap}
+.formula .p{padding:1px 4px;border-radius:4px;transition:background .3s,color .3s}
+.formula .p.on{background:var(--ink);color:var(--surface)}
+.rows{display:grid;gap:12px;margin-top:14px}
+.row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;align-items:center;transition:opacity .3s}
+.row.off{opacity:.3}
+.row.on .lab{color:var(--ink);font-weight:600}
+.row.on .lab::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--output);margin-right:6px;vertical-align:1px}
+.lab{font-size:.85rem;color:var(--muted);line-height:1.3}
+.lab small{display:block;font-family:var(--font-mono);font-size:.78rem}
+@media (max-width:520px){.row{grid-template-columns:minmax(0,1fr)}.row .lab{margin-bottom:-6px}}
+.vec{display:flex;flex-wrap:wrap;gap:4px}
+.v{font-family:var(--font-mono);font-size:.8rem;min-width:54px;padding:5px 4px;text-align:center;border-radius:6px;border:1px solid var(--line);font-variant-numeric:tabular-nums;transition:background .4s}
+.onehot .v{min-width:46px;display:grid;gap:2px}
+.onehot .v b{font-weight:600}
+.onehot .v small{font-family:var(--font-body);font-size:.7rem;color:var(--muted)}
+.onehot .v.hot{border-color:var(--input);background:color-mix(in srgb,var(--input) 22%,var(--surface))}
+.bars{display:grid;gap:4px}
+.bar{display:grid;grid-template-columns:52px minmax(0,1fr) 48px;gap:8px;align-items:center;font-size:.82rem}
+.bar .t{height:12px;background:var(--faint);border-radius:3px;overflow:hidden}
+.bar .t i{display:block;height:100%;background:var(--output);border-radius:3px;transition:width .5s}
+.bar.top span:first-child{font-weight:700}
+.bar .n{font-family:var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:520px){.duo{grid-template-columns:minmax(0,1fr)}}
+.duo h4{margin:0 0 6px;font-size:.82rem;font-weight:600}
+.duo .alt .bar .t i{background:var(--neg)}
+.kbd{font-family:var(--font-mono);font-size:.78rem;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){.edge.on{animation:none;stroke-dasharray:none}*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>RNN, Step by Step</h1>
+    <p>A tiny RNN reads <span class="w">May the force be with</span> one word at a time and guesses the next word after each one. Press Play to watch it run, or use Next and Back to go at your own pace.</p>
+    <div class="legend" aria-hidden="true">
+      <span style="color:var(--input)"><i class="sw"></i><span style="color:var(--muted)">input word xₜ</span></span>
+      <span style="color:var(--memory)"><i class="sw"></i><span style="color:var(--muted)">hidden state hₜ (memory)</span></span>
+      <span style="color:var(--output)"><i class="sw"></i><span style="color:var(--muted)">output yₜ (guess for the next word)</span></span>
+    </div>
+  </header>
+
+  <div class="controls" role="group" aria-label="Playback">
+    <button id="restart" type="button" title="Back to the start">⟲ Restart</button>
+    <button id="prev" type="button">‹ Back</button>
+    <button id="play" class="primary" type="button">▶ Play</button>
+    <button id="next" type="button">Next ›</button>
+    <label class="kbd" for="speed">Speed
+      <select id="speed"><option value="5200">slow</option><option value="3600" selected>normal</option><option value="2200">fast</option></select>
+    </label>
+    <span class="count" id="count">Step 1 of 28</span>
+    <div class="track" id="track"></div>
+  </div>
+
+  <div class="stage"><svg id="svg" viewBox="0 0 1060 370" role="img" aria-label="Unrolled RNN with five time steps"></svg></div>
+
+  <div class="grid">
+    <section class="panel narr" aria-live="polite">
+      <div class="tag" id="tag"></div>
+      <h2 id="title"></h2>
+      <div id="body"></div>
+      <p class="note kbd">Keyboard: ← → to step, space to play or pause. Click a column in the diagram to jump to that word.</p>
+    </section>
+    <section class="panel">
+      <div class="tag">Inside the active cell</div>
+      <div class="formula" id="formula">
+        <div>h<sub>t</sub> = <span class="p" data-k="tanh">tanh(</span> <span class="p" data-k="mem">W<sub>hh</sub>·h<sub>t−1</sub></span> + <span class="p" data-k="in">W<sub>xh</sub>·x<sub>t</sub></span> <span class="p" data-k="tanh">)</span></div>
+        <div>y<sub>t</sub> = <span class="p" data-k="out">softmax(W<sub>hy</sub>·h<sub>t</sub>)</span></div>
+      </div>
+      <div class="rows" id="rows"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function(){
+const V=["May","the","force","be","with","you","me"];
+const Wxh=[[0.8,0.5,0.2,-1.5,-1.1,0.2,0.0],[1.3,0.5,-0.5,0.5,-0.7,0.1,0.4],[-1.1,0.3,-0.1,0.3,-1.1,-0.1,0.3],[0.9,-0.3,0.1,0.0,-1.2,0.1,-0.2]];
+const Whh=[[0.9,0.8,-0.1,0.0],[-0.2,-0.1,-0.6,0.6],[0.5,0.1,-0.5,0.6],[-0.6,0.5,0.9,-0.9]];
+const Why=[[0.0,-0.2,0.4,0.2],[0.9,1.9,-1.3,1.0],[1.8,0.7,1.3,-1.0],[1.9,-1.8,-0.2,0.9],[-1.9,1.0,1.5,-0.6],[-1.8,-0.8,-0.6,1.8],[-0.9,-1.0,-1.3,-2.0]];
+const SENT=["May","the","force","be","with"], NEXT=["the","force","be","with","you"];
+const H=4, T=SENT.length;
+const mv=(M,v)=>M.map(r=>r.reduce((s,w,j)=>s+w*v[j],0));
+function cell(word,hprev){
+  const k=V.indexOf(word);
+  const x=V.map((_,i)=>i===k?1:0);
+  const a=Wxh.map(r=>r[k]);
+  const b=mv(Whh,hprev);
+  const s=a.map((v,i)=>v+b[i]);
+  const h=s.map(Math.tanh);
+  const z=mv(Why,h); const m=Math.max(...z); const e=z.map(v=>Math.exp(v-m)); const S=e.reduce((p,q)=>p+q,0);
+  const p=e.map(v=>v/S);
+  const top=p.indexOf(Math.max(...p));
+  return {word,x,a,hprev,b,s,h,p,top};
+}
+const R=[]; let hp=[0,0,0,0];
+for(const w of SENT){const r=cell(w,hp);R.push(r);hp=r.h;}
+const NOMEM=cell("with",[0,0,0,0]);
+
+/* ---------- steps ---------- */
+const SUB=["read","input","memory","combine","predict"];
+const steps=[{kind:"intro"}];
+for(let t=0;t<T;t++) for(const s of SUB) steps.push({kind:"word",t,s});
+steps.push({kind:"nomem"}); steps.push({kind:"summary"});
+
+/* ---------- helpers ---------- */
+const f=v=>(v>=0?"+":"−")+Math.abs(v).toFixed(2);
+const pct=v=>Math.round(v*100)+"%";
+const sub=n=>String(n).split("").map(c=>"₀₁₂₃₄₅₆₇₈₉"[c]).join("");
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function heat(v){const c=v>=0?"var(--pos)":"var(--neg)";const a=Math.min(1,Math.abs(v))*55;return `color-mix(in srgb, ${c} ${a.toFixed(0)}%, var(--surface))`;}
+const W=w=>`<span class="w">${w}</span>`;
+function vec(arr,cls){return `<div class="vec ${cls||""}">`+arr.map(v=>`<span class="v" style="background:${heat(v)}">${f(v)}</span>`).join("")+`</div>`;}
+function onehot(x){return `<div class="vec onehot">`+x.map((v,i)=>`<span class="v ${v?"hot":""}"><b>${v}</b><small>${V[i]}</small></span>`).join("")+`</div>`;}
+function bars(p,limit){const order=p.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]);const top=order[0][1];
+  return `<div class="bars">`+V.map((w,i)=>`<div class="bar ${i===top?"top":""}"><span>${w}</span><span class="t"><i style="width:${(p[i]*100).toFixed(1)}%"></i></span><span class="n">${pct(p[i])}</span></div>`).join("")+`</div>`;}
+const dots=n=>`<div class="vec">`+Array.from({length:n},()=>`<span class="v">·</span>`).join("")+`</div>`;
+
+/* ---------- diagram ---------- */
+const svg=document.getElementById("svg");
+const X0=200, DX=192, BW=128;
+const cx=i=>X0+i*DX;
+function buildSVG(){
+  let s=`<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${css("--muted")}"/></marker></defs>`;
+  s+=`<text x="60" y="186" text-anchor="middle" class="mono" font-size="15">h${sub(0)}</text><text x="60" y="206" text-anchor="middle" class="muted" font-size="12">= 0</text>`;
+  s+=`<path class="edge e-h" id="eh0" d="M86,180 L${cx(0)-BW/2-4},180" marker-end="url(#ah)"/>`;
+  for(let i=0;i<T;i++){
+    const x=cx(i);
+    if(i<T-1) s+=`<path class="edge e-h" id="eh${i+1}" d="M${x+BW/2},180 L${cx(i+1)-BW/2-4},180" marker-end="url(#ah)"/>`;
+    s+=`<g class="col" id="col${i}">
+      <path class="edge e-in" id="ein${i}" d="M${x},288 L${x},228" marker-end="url(#ah)"/>
+      <path class="edge e-out" id="eout${i}" d="M${x},132 L${x},90" marker-end="url(#ah)"/>
+      <rect class="out box" x="${x-BW/2}" y="20" width="${BW}" height="66" rx="10"/>
+      <text x="${x}" y="40" text-anchor="middle" class="muted" font-size="12">y${sub(i+1)} · guess</text>
+      <text x="${x}" y="68" text-anchor="middle" font-size="19" font-weight="700" id="outw${i}">?</text>
+      <rect class="cell box" x="${x-BW/2}" y="134" width="${BW}" height="92" rx="12"/>
+      <text x="${x}" y="158" text-anchor="middle" class="mono" font-size="15">h${sub(i+1)}</text>
+      ${[0,1,2,3].map(j=>`<rect class="hcell" id="hc${i}_${j}" x="${x-50+j*26}" y="170" width="22" height="22" rx="4" fill="${css("--faint")}" stroke="${css("--line")}"/>`).join("")}
+      <text x="${x}" y="214" text-anchor="middle" class="muted" font-size="11">same weights W</text>
+      <rect class="in box" x="${x-BW/2}" y="292" width="${BW}" height="48" rx="10"/>
+      <text x="${x}" y="322" text-anchor="middle" font-size="18" font-weight="600">${SENT[i]}</text>
+      <text x="${x}" y="360" text-anchor="middle" class="mono muted" font-size="13">x${sub(i+1)} · t=${i+1}</text>
+      <rect class="colhit" x="${x-BW/2-20}" y="10" width="${BW+40}" height="355" data-col="${i}"/>
+    </g>`;
+  }
+  svg.innerHTML=s;
+  svg.querySelectorAll(".colhit").forEach(el=>el.addEventListener("click",()=>{go(1+Number(el.dataset.col)*5);stop();}));
+}
+function setHC(i,h){for(let j=0;j<4;j++){const el=document.getElementById(`hc${i}_${j}`);el.setAttribute("fill",h?resolveHeat(h[j]):css("--faint"));}}
+function resolveHeat(v){const c=css(v>=0?"--pos":"--neg");const a=Math.min(1,Math.abs(v))*0.85;return hexA(c,a);}
+function hexA(hex,a){const n=parseInt(hex.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${Math.max(.12,a).toFixed(2)})`;}
+
+/* ---------- panel rows ---------- */
+const rowsEl=document.getElementById("rows");
+function row(key,label,math,content,state){return `<div class="row ${state}" data-k="${key}"><div class="lab">${label}<small>${math}</small></div><div>${content}</div></div>`;}
+
+function renderPanel(r,t,phase,mode){
+  // phase index: 0 read,1 input,2 memory,3 combine,4 predict, 5 = everything shown
+  const st=k=>{const need={x:0,a:1,hp:2,b:2,s:3,h:3,y:4}[k];const cur={x:0,a:1,hp:2,b:2,s:3,h:3,y:4};
+    if(phase>=5) return "done";
+    if(need===phase) return "on"; return need<phase?"done":"off";};
+  const show=k=>st(k)!=="off";
+  const T1=sub(t+1), T0=sub(t);
+  let html="";
+  html+=row("x","Input word as one-hot",`x${T1}`,show("x")?onehot(r.x):dots(7),st("x"));
+  html+=row("a","Input part",`W_xh · x${T1}`,show("a")?vec(r.a):dots(4),st("a"));
+  html+=row("hp","Memory from before",`h${T0}`,show("hp")?vec(r.hprev):dots(4),st("hp"));
+  html+=row("b","Memory part",`W_hh · h${T0}`,show("b")?vec(r.b):dots(4),st("b"));
+  html+=row("s","Sum of both parts",`input + memory`,show("s")?vec(r.s):dots(4),st("s"));
+  html+=row("h","New hidden state",`h${T1} = tanh(sum)`,show("h")?vec(r.h):dots(4),st("h"));
+  if(mode==="nomem"){
+    html+=row("y","Guess for the next word",`y${T1} = softmax(W_hy · h${T1})`,
+      `<div class="duo"><div><h4>with memory</h4>${bars(R[4].p)}</div><div class="alt"><h4>memory wiped (h${sub(4)} = 0)</h4>${bars(r.p)}</div></div>`,"on");
+  } else {
+    html+=row("y","Guess for the next word",`y${T1} = softmax(W_hy · h${T1})`,show("y")?bars(r.p):`<div class="kbd">not computed yet</div>`,st("y"));
+  }
+  rowsEl.innerHTML=html;
+  const on={0:[],1:["in"],2:["mem"],3:["in","mem","tanh"],4:["out"],5:[]}[phase]||[];
+  document.querySelectorAll("#formula .p").forEach(el=>el.classList.toggle("on",on.includes(el.dataset.k)));
+}
+
+/* ---------- narration ---------- */
+function narrate(step){
+  if(step.kind==="intro") return {tag:"Overview",title:"One cell, used five times",body:
+    `<p>An RNN reads a sequence one element per time step. The diagram shows the same cell <b>unrolled</b> over five steps, one per word. Every column uses <b>the same weights</b> W<sub>xh</sub>, W<sub>hh</sub> and W<sub>hy</sub>.</p>
+     <p>Each step does three things: take the new word <span class="c-in">x<sub>t</sub></span>, mix it with the memory <span class="c-h">h<sub>t−1</sub></span> from the step before, and produce a guess <span class="c-out">y<sub>t</sub></span> for the next word.</p>
+     <p>The memory starts empty: h${sub(0)} is all zeros. The goal is to see why the last guess is ${W("you")} and not ${W("me")}.</p>`};
+  if(step.kind==="nomem"){const p=NOMEM.p;return {tag:"Memory test",title:"What if the memory is wiped?",body:
+    `<p>Same last word ${W("with")}, same weights, but now h${sub(4)} is set to zero, as if the network had never read ${W("May the force be")}.</p>
+     <p>The input part is identical, only the memory part becomes 0. The guess flips to ${W(V[NOMEM.top])} with ${pct(p[NOMEM.top])}, while ${W("you")} drops to ${pct(p[5])}.</p>
+     <p>This tiny network was trained on two sentences, ${W("May the force be with you")} and ${W("with me")}. Only the hidden state tells it which one it is in. That is the "context and memory" from the lecture.</p>`};}
+  if(step.kind==="summary") return {tag:"Summary",title:"What you just watched",body:
+    `<p><b>Same weights at every step.</b> The cell never changes, only its inputs do. That is why one model can read sentences of any length.</p>
+     <p><b>The hidden state is the memory.</b> Each h<sub>t</sub> is computed from the new word and the previous h<sub>t−1</sub>, so information from ${W("May")} is still inside h${sub(5)}.</p>
+     <p><b>An output at every step.</b> Here each y<sub>t</sub> guesses the next word (many to many). For sentiment you would only use the last one (many to one).</p>
+     <p>Press Restart to watch it again, or click any column to revisit a word.</p>`};
+  const t=step.t, r=R[t], w=r.word, T1=sub(t+1), T0=sub(t);
+  const tag=`Word ${t+1} of 5 · ${w} · part ${SUB.indexOf(step.s)+1} of 5`;
+  switch(step.s){
+    case "read": return {tag,title:`Read the word ${w}`,body:
+      `<p>The word ${W(w)} enters the cell as <span class="c-in">x${T1}</span>. Words are stored as <b>one-hot vectors</b>: one slot per word in the vocabulary, a 1 for this word and 0 everywhere else.</p>
+       <p>The vocabulary here has only 7 words, so x${T1} has 7 numbers.</p>`};
+    case "input": return {tag,title:"Input part: W_xh · x"+T1,body:
+      `<p>The input is multiplied by the input weights <span class="c-in">W<sub>xh</sub></span>. Because x${T1} is one-hot, this simply <b>picks the column</b> of W<sub>xh</sub> that belongs to ${W(w)}.</p>
+       <p>Result: 4 numbers that describe "what the new word says", without any context yet.</p>`};
+    case "memory": return t===0 ? {tag,title:"Memory part: nothing yet",body:
+      `<p>The cell now looks at the previous hidden state <span class="c-h">h${T0}</span>. This is the first word, so h${T0} is all zeros and W<sub>hh</sub> · h${T0} is zero too.</p>
+       <p>The first step works only from the word itself.</p>`} : {tag,title:`Memory part: W_hh · h${T0}`,body:
+      `<p>The hidden state <span class="c-h">h${T0}</span> arrives from the previous column (purple arrow). It holds a summary of ${W(SENT.slice(0,t).join(" "))}.</p>
+       <p>It is multiplied by the recurrent weights <span class="c-h">W<sub>hh</sub></span>. These are the same weights at every step.</p>`};
+    case "combine": return {tag,title:`Combine and squash: h${T1}`,body:
+      `<p>Input part and memory part are <b>added</b>, then passed through <b>tanh</b>, which squashes every value into the range −1 to 1.</p>
+       <p>The result is the new hidden state <span class="c-h">h${T1}</span>, shown as the four colored squares in the cell (green = positive, red = negative). It now carries ${W(SENT.slice(0,t+1).join(" "))}.</p>`};
+    case "predict": {const ok=r.top===V.indexOf(NEXT[t]);return {tag,title:`Guess the next word: ${V[r.top]}`,body:
+      `<p>The output weights <span class="c-out">W<sub>hy</sub></span> turn h${T1} into one score per word, and <b>softmax</b> turns the scores into probabilities that add up to 100%.</p>
+       <p>Top guess: ${W(V[r.top])} with ${pct(r.p[r.top])}. The real next word is ${W(NEXT[t])} ${ok?"<span style='color:var(--ok)'>✓</span>":""}.</p>
+       ${t<T-1?`<p>h${T1} is now handed on to the next column as its memory.</p>`:`<p>${W("you")} wins because h${sub(5)} still remembers ${W("May the force be")}. The next step shows what happens without that memory.</p>`}`};}
+  }
+}
+
+/* ---------- render ---------- */
+let cur=0, timer=null;
+const $=id=>document.getElementById(id);
+function render(){
+  const step=steps[cur];
+  // columns
+  let activeT=-1, phase=5;
+  if(step.kind==="word"){activeT=step.t;phase=SUB.indexOf(step.s);}
+  if(step.kind==="nomem"){activeT=4;phase=5;}
+  const doneUpTo = step.kind==="intro"?-1 : step.kind==="word"? step.t-1 : T-1;
+  for(let i=0;i<T;i++){
+    const col=$("col"+i);
+    const computed = i<=doneUpTo || (i===activeT && phase>=3);
+    const outShown = i<=doneUpTo || (i===activeT && phase>=4);
+    col.classList.toggle("future", step.kind==="word" && i>activeT);
+    col.classList.toggle("active", i===activeT);
+    col.classList.toggle("lit-in", i===activeT && step.kind==="word" && phase<=1);
+    col.classList.toggle("lit-out", i===activeT && (phase===4 || step.kind==="nomem"));
+    col.classList.toggle("alt", step.kind==="nomem" && i===4);
+    const r = (step.kind==="nomem" && i===4) ? NOMEM : R[i];
+    setHC(i, computed ? r.h : null);
+    $("outw"+i).textContent = outShown ? `${V[r.top]} ${pct(r.p[r.top])}` : "?";
+    $("outw"+i).style.fill = (step.kind==="nomem" && i===4) ? "var(--neg)" : "";
+    // edges
+    const ein=$("ein"+i), eout=$("eout"+i);
+    ein.setAttribute("class","edge e-in"+(i===activeT&&step.kind==="word"&&phase<=1?" on":(i<=doneUpTo||(i===activeT&&phase>1)?" done":"")));
+    eout.setAttribute("class","edge e-out"+(i===activeT&&phase===4?" on":(outShown?" done":"")));
+  }
+  for(let i=0;i<T;i++){ // h edges into column i
+    const e=$("eh"+i);
+    let c="edge e-h";
+    if(step.kind==="nomem" && i===4) c+=" cut";
+    else if(i===activeT && step.kind==="word" && phase===2) c+=" on";
+    else if(i<=doneUpTo || (i===activeT && phase>2) || (step.kind!=="intro"&&step.kind!=="word"&&i<=4)) c+=" done";
+    e.setAttribute("class",c);
+  }
+  // keep the active column in view on narrow screens
+  const stage=document.querySelector(".stage");
+  if(stage.scrollWidth>stage.clientWidth){
+    const sc=svg.clientWidth/1060, focus=activeT>=0?cx(activeT):(step.kind==="intro"?0:cx(T-1));
+    const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+    stage.scrollTo({left:Math.max(0,focus*sc-stage.clientWidth/2),behavior:reduce?"auto":"smooth"});
+  }
+  // panel
+  if(step.kind==="word") renderPanel(R[step.t],step.t,phase);
+  else if(step.kind==="nomem") renderPanel(NOMEM,4,4,"nomem");
+  else if(step.kind==="summary") renderPanel(R[4],4,5);
+  else renderPanel(R[0],0,-1);
+  const n=narrate(step);
+  $("tag").textContent=n.tag; $("title").innerHTML=n.title; $("body").innerHTML=n.body;
+  $("count").textContent=`Step ${cur+1} of ${steps.length}`;
+  $("prev").disabled=cur===0; $("next").disabled=cur===steps.length-1;
+  document.querySelectorAll("#track i[data-s]").forEach(el=>{const k=+el.dataset.s;el.className=k<cur?"done":k===cur?"now":"";});
+}
+function go(i){cur=Math.max(0,Math.min(steps.length-1,i));render();}
+function stop(){clearInterval(timer);timer=null;$("play").textContent="▶ Play";}
+function play(){
+  if(cur===steps.length-1) go(0);
+  $("play").textContent="❚❚ Pause";
+  timer=setInterval(()=>{if(cur>=steps.length-1){stop();return;} go(cur+1);},+$("speed").value);
+}
+$("play").onclick=()=>timer?stop():play();
+$("next").onclick=()=>{stop();go(cur+1);};
+$("prev").onclick=()=>{stop();go(cur-1);};
+$("restart").onclick=()=>{stop();go(0);};
+$("speed").onchange=()=>{if(timer){stop();play();}};
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="SELECT") return;
+  if(e.key==="ArrowRight"){stop();go(cur+1);}
+  else if(e.key==="ArrowLeft"){stop();go(cur-1);}
+  else if(e.key===" "){e.preventDefault();timer?stop():play();}
+});
+// progress track, grouped by word
+const track=$("track"); let th="";
+steps.forEach((s,k)=>{ if(k>0 && (s.kind!=="word" || s.s==="read")) th+=`<i class="gap"></i>`; th+=`<i data-s="${k}" title="Step ${k+1}"></i>`; });
+track.innerHTML=th;
+track.querySelectorAll("i[data-s]").forEach(el=>el.addEventListener("click",()=>{stop();go(+el.dataset.s);}));
+
+buildSVG(); render();
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{buildSVG();render();});
+new MutationObserver(()=>{buildSVG();render();}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+})();
+</script>
+
+</body></html>
