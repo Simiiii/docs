@@ -1,13 +1,16 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RNN, Step by Step</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
 /* Layout: control bar, unrolled RNN diagram across the full width, then narration beside the live math of the active cell */
 :root{
-  --bg:#f4f6f9; --surface:#ffffff; --ink:#172031; --muted:#5a6578; --line:#d8dee8; --faint:#eef1f6;
+  --bg:#ffffff; --surface:#ffffff; --ink:#1f2633; --muted:#5f6878; --line:#e3e2de; --faint:#f4f4f2;
   --input:#c9701c; --memory:#6a4fc4; --output:#2a66cf;
   --pos:#0f7a68; --neg:#bf3f45; --ok:#1d7a3e;
   --font-display:"Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
@@ -15,19 +18,20 @@
   --font-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#10141c; --surface:#171d28; --ink:#e7ebf2; --muted:#9aa4b5; --line:#2c3545; --faint:#1d2431;
+  --bg:#191919; --surface:#202020; --ink:#e9e9e7; --muted:#a3a3a0; --line:#343434; --faint:#2a2a2a;
   --input:#e8954a; --memory:#a58cf2; --output:#6e9df0;
   --pos:#3cc4a6; --neg:#f07a80; --ok:#5cc983; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#10141c; --surface:#171d28; --ink:#e7ebf2; --muted:#9aa4b5; --line:#2c3545; --faint:#1d2431;
+  --bg:#191919; --surface:#202020; --ink:#e9e9e7; --muted:#a3a3a0; --line:#343434; --faint:#2a2a2a;
   --input:#e8954a; --memory:#a58cf2; --output:#6e9df0;
   --pos:#3cc4a6; --neg:#f07a80; --ok:#5cc983; color-scheme:dark}
 
 *{box-sizing:border-box}
+html,body{margin:0;width:100%}
+img{max-width:100%}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5}
-.wrap{max-width:1180px;margin:0 auto;padding-block:28px 48px;
-  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
-  display:grid;gap:18px}
+.wrap{width:100%;margin:0;padding:clamp(10px,2vw,20px);display:grid;gap:clamp(10px,1.6vw,16px)}
 header h1{font-family:var(--font-display);font-size:clamp(1.6rem,3.2vw,2.2rem);font-weight:700;letter-spacing:-.01em;margin:0;text-wrap:balance}
 header p{margin:6px 0 0;color:var(--muted);max-width:68ch}
 .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:10px;font-size:.85rem;color:var(--muted)}
@@ -51,7 +55,7 @@ select{font:inherit;color:var(--ink);background:var(--faint);border:1px solid va
 
 /* diagram */
 .stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
-.stage svg{display:block;min-width:680px;width:100%;height:auto}
+.stage svg{display:block;min-width:600px;width:100%;height:auto}
 svg text{font-family:var(--font-body);fill:var(--ink)}
 svg .mono{font-family:var(--font-mono)}
 svg .muted{fill:var(--muted)}
@@ -76,7 +80,7 @@ svg .muted{fill:var(--muted)}
 
 /* panels */
 .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:18px;align-items:start}
-@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 18px 20px;min-width:0}
 .tag{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .narr h2{font-family:var(--font-display);font-size:1.35rem;margin:6px 0 10px;line-height:1.25;text-wrap:balance}
@@ -115,6 +119,8 @@ svg .muted{fill:var(--muted)}
 .kbd{font-family:var(--font-mono);font-size:.78rem;color:var(--muted)}
 @media (prefers-reduced-motion: reduce){.edge.on{animation:none;stroke-dasharray:none}*{transition:none!important}}
 </style>
+</head>
+<body>
 
 <div class="wrap">
   <header>
@@ -389,4 +395,5 @@ new MutationObserver(()=>{buildSVG();render();}).observe(document.documentElemen
 })();
 </script>
 
-</body></html>
+</body>
+</html>
