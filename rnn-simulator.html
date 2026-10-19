@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Step-by-Step RNN Simulator</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f7f7f5;
+    --border: #e3e2de;
+    --text: #37352f;
+    --muted: #787774;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --green: #16a34a;
+    --green-soft: #dcfce7;
+    --amber: #d97706;
+    --amber-soft: #fef3c7;
+    --purple: #7c3aed;
+    --purple-soft: #ede9fe;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    background: var(--bg);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .title {
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+  }
+
+  button {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.15s ease;
+  }
+
+  button:hover:not(:disabled) {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .pill {
+    font-size: 0.75rem;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .pill.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* Timeline Overview Bar */
+  .timeline {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .time-node {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    text-align: center;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+  }
+
+  .time-node.current {
+    border: 2px solid var(--accent);
+    background: var(--accent-soft);
+    font-weight: 600;
+  }
+
+  /* Main Diagram Layout */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  @media (max-width: 680px) {
+    .main-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .diagram-box {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fafafa;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  svg {
+    width: 100%;
+    height: auto;
+    max-height: 290px;
+  }
+
+  /* SVG node transitions */
+  .svg-box {
+    fill: #ffffff;
+    stroke: #cbd5e1;
+    stroke-width: 2;
+    transition: all 0.3s ease;
+  }
+
+  .svg-wire {
+    stroke: #cbd5e1;
+    stroke-width: 2.5;
+    fill: none;
+    transition: all 0.3s ease;
+  }
+
+  .active-input {
+    fill: var(--amber-soft) !important;
+    stroke: var(--amber) !important;
+  }
+
+  .active-memory {
+    fill: var(--purple-soft) !important;
+    stroke: var(--purple) !important;
+  }
+
+  .active-cell {
+    fill: var(--accent-soft) !important;
+    stroke: var(--accent) !important;
+  }
+
+  .active-output {
+    fill: var(--green-soft) !important;
+    stroke: var(--green) !important;
+  }
+
+  .wire-highlight {
+    stroke: var(--accent) !important;
+    stroke-width: 3.5 !important;
+    stroke-dasharray: 6 4;
+    animation: flow 0.8s linear infinite;
+  }
+
+  @keyframes flow {
+    to {
+      stroke-dashoffset: -10;
+    }
+  }
+
+  /* Right Side Vectors & Probabilities */
+  .info-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .vector-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: var(--surface);
+  }
+
+  .vector-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .vector-values {
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .prob-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 5px;
+    font-size: 0.8rem;
+  }
+
+  .prob-word {
+    width: 48px;
+    font-family: monospace;
+    font-weight: 600;
+  }
+
+  .prob-bar-bg {
+    flex: 1;
+    height: 10px;
+    background: #e5e7eb;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+
+  .prob-bar-fill {
+    height: 100%;
+    background: var(--green);
+    transition: width 0.35s ease;
+  }
+
+  .prob-val {
+    width: 34px;
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .narrative-box {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .narrative-step {
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <div class="title">Interactive RNN Step-by-Step Simulator</div>
+    <div class="controls">
+      <button id="prevBtn" onclick="changeStep(-1)">Previous Step</button>
+      <button id="nextBtn" class="btn-primary" onclick="changeStep(1)">Next Step</button>
+    </div>
+  </div>
+
+  <!-- Quick Step Pills -->
+  <div class="pills" id="pillContainer"></div>
+
+  <!-- Sequence Timeline -->
+  <div class="timeline">
+    <div class="time-node" id="time-0">t = 0<br><small>Init Memory</small></div>
+    <div class="time-node" id="time-1">t = 1<br><small>Word: "the"</small></div>
+    <div class="time-node" id="time-2">t = 2<br><small>Word: "cat"</small></div>
+    <div class="time-node" id="time-3">t = 3<br><small>Word: "sat"</small></div>
+  </div>
+
+  <div class="main-grid">
+    <!-- Left: Animated SVG Cell Diagram -->
+    <div class="diagram-box">
+      <svg viewBox="0 0 420 280">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b"/>
+          </marker>
+        </defs>
+
+        <!-- Wires -->
+        <line id="wire-h-in" class="svg-wire" x1="95" y1="145" x2="148" y2="145" marker-end="url(#arrow)" />
+        <line id="wire-x-in" class="svg-wire" x1="210" y1="220" x2="210" y2="182" marker-end="url(#arrow)" />
+        <line id="wire-h-out" class="svg-wire" x1="270" y1="145" x2="325" y2="145" marker-end="url(#arrow)" />
+        <line id="wire-y-out" class="svg-wire" x1="210" y1="110" x2="210" y2="68" marker-end="url(#arrow)" />
+
+        <!-- Previous Hidden State Box (Left) -->
+        <rect id="node-h-prev" class="svg-box" x="15" y="118" width="80" height="54" rx="8" />
+        <text x="55" y="142" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">Past h(t-1)</text>
+        <text id="svg-h-prev-label" x="55" y="159" text-anchor="middle" font-size="10" fill="#64748b">Memory In</text>
+
+        <!-- Core RNN Cell (Center) -->
+        <rect id="node-cell" class="svg-box" x="150" y="110" width="120" height="70" rx="12" />
+        <text x="210" y="138" text-anchor="middle" font-size="13" font-weight="700" fill="#1e293b">RNN Cell</text>
+        <text x="210" y="156" text-anchor="middle" font-size="10" fill="#475569">tanh(Wx*x + Wh*h)</text>
+
+        <!-- Updated Hidden State Box (Right) -->
+        <rect id="node-h-new" class="svg-box" x="328" y="118" width="80" height="54" rx="8" />
+        <text x="368" y="142" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">New h(t)</text>
+        <text id="svg-h-new-label" x="368" y="159" text-anchor="middle" font-size="10" fill="#64748b">Memory Out</text>
+
+        <!-- Input Token x_t (Bottom) -->
+        <rect id="node-x" class="svg-box" x="150" y="222" width="120" height="46" rx="8" />
+        <text x="210" y="242" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">Input x(t)</text>
+        <text id="svg-x-label" x="210" y="258" text-anchor="middle" font-size="11" fill="#64748b">Word Embedding</text>
+
+        <!-- Output Prediction y_t (Top) -->
+        <rect id="node-y" class="svg-box" x="145" y="18" width="130" height="48" rx="8" />
+        <text x="210" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">Output y(t)</text>
+        <text id="svg-y-label" x="210" y="55" text-anchor="middle" font-size="11" fill="#16a34a">Next Word Pred</text>
+      </svg>
+    </div>
+
+    <!-- Right: Live Vectors & Prediction Bars -->
+    <div class="info-panel">
+      <div class="vector-card">
+        <div class="vector-label">
+          <span>Input Embedding x(t)</span>
+          <span id="token-badge">--</span>
+        </div>
+        <div class="vector-values" id="val-x">[ 0.00,  0.00,  0.00 ]</div>
+      </div>
+
+      <div class="vector-card">
+        <div class="vector-label">
+          <span>Incoming Memory h(t-1)</span>
+          <span>From Past</span>
+        </div>
+        <div class="vector-values" id="val-h-prev">[ 0.00,  0.00,  0.00 ]</div>
+      </div>
+
+      <div class="vector-card">
+        <div class="vector-label">
+          <span>Updated Hidden State h(t)</span>
+          <span>New Summary</span>
+        </div>
+        <div class="vector-values" id="val-h-new">[ 0.00,  0.00,  0.00 ]</div>
+      </div>
+
+      <div class="vector-card">
+        <div class="vector-label">
+          <span>Next-Word Probabilities y(t)</span>
+          <span>Softmax</span>
+        </div>
+        <div id="prob-bars"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Explanation Box -->
+  <div class="narrative-box">
+    <div class="narrative-step" id="step-title">Stage 0</div>
+    <div id="step-desc">Description goes here.</div>
+  </div>
+</div>
+
+<script>
+  const stages = [
+    {
+      pill: "0. Init (t=0)",
+      timeIndex: 0,
+      title: "Stage 0 (t = 0): Initialize Empty Memory",
+      desc: "Before reading any words, the RNN starts with a blank memory. Its initial hidden state vector h(0) is filled with zeros, ready to be passed into time step t = 1.",
+      token: "None",
+      x: "[ 0.00,  0.00,  0.00 ]",
+      hPrev: "[ 0.00,  0.00,  0.00 ]",
+      hNew: "[ 0.00,  0.00,  0.00 ]",
+      svgX: "Waiting...",
+      svgY: "No Prediction Yet",
+      activeNodes: ["node-h-new"],
+      activeWires: ["wire-h-out"],
+      probs: [
+        { word: '"the"', pct: 25 },
+        { word: '"cat"', pct: 25 },
+        { word: '"sat"', pct: 25 },
+        { word: '"on"',  pct: 25 }
+      ]
+    },
+    {
+      pill: "1A. Read 'the'",
+      timeIndex: 1,
+      title: "Stage 1A (t = 1): Feed Word 1 ('the') & Combine with Memory",
+      desc: "Word 1 ('the') is converted from its token ID into embedding vector x(1). It enters the bottom of the RNN cell and merges with the empty memory h(0) coming from the left.",
+      token: '"the" (ID: 4)',
+      x: "[ 0.60, -0.20,  0.10 ]",
+      hPrev: "[ 0.00,  0.00,  0.00 ]",
+      hNew: "Computing...",
+      svgX: '"the"',
+      svgY: "Computing...",
+      activeNodes: ["node-x", "node-h-prev", "node-cell"],
+      activeWires: ["wire-x-in", "wire-h-in"],
+      probs: [
+        { word: '"cat"', pct: 25 },
+        { word: '"dog"', pct: 25 },
+        { word: '"on"',  pct: 25 },
+        { word: '"sat"', pct: 25 }
+      ]
+    },
+    {
+      pill: "1B. Update h(1)",
+      timeIndex: 1,
+      title: "Stage 1B (t = 1): Update Hidden State h(1) & Predict Next Word",
+      desc: "The cell applies tanh() to create the new hidden state h(1). Because 'the' is an article, h(1) now encodes that a noun should follow. It predicts 'cat' (42%) or 'dog' (35%) and passes h(1) forward to step t = 2.",
+      token: '"the" (ID: 4)',
+      x: "[ 0.60, -0.20,  0.10 ]",
+      hPrev: "[ 0.00,  0.00,  0.00 ]",
+      hNew: "[ 0.54, -0.19,  0.10 ]",
+      svgX: '"the"',
+      svgY: 'Top: "cat" (42%)',
+      activeNodes: ["node-cell", "node-h-new", "node-y"],
+      activeWires: ["wire-h-out", "wire-y-out"],
+      probs: [
+        { word: '"cat"', pct: 42 },
+        { word: '"dog"', pct: 35 },
+        { word: '"on"',  pct: 15 },
+        { word: '"sat"', pct: 8 }
+      ]
+    },
+    {
+      pill: "2A. Read 'cat'",
+      timeIndex: 2,
+      title: "Stage 2A (t = 2): Feed Word 2 ('cat') & Combine with h(1)",
+      desc: "Word 2 ('cat') enters as vector x(2) and combines with incoming memory h(1), which still remembers that the first word was 'the'.",
+      token: '"cat" (ID: 12)',
+      x: "[-0.30,  0.85,  0.40 ]",
+      hPrev: "[ 0.54, -0.19,  0.10 ]",
+      hNew: "Computing...",
+      svgX: '"cat"',
+      svgY: "Computing...",
+      activeNodes: ["node-x", "node-h-prev", "node-cell"],
+      activeWires: ["wire-x-in", "wire-h-in"],
+      probs: [
+        { word: '"cat"', pct: 42 },
+        { word: '"dog"', pct: 35 },
+        { word: '"on"',  pct: 15 },
+        { word: '"sat"', pct: 8 }
+      ]
+    },
+    {
+      pill: "2B. Update h(2)",
+      timeIndex: 2,
+      title: "Stage 2B (t = 2): Update Hidden State h(2) & Predict Action Verb",
+      desc: "The new hidden state h(2) now summarizes the full phrase 'the cat'. Because a subject noun phrase is complete, the output layer strongly predicts a verb next, such as 'sat' (64%).",
+      token: '"cat" (ID: 12)',
+      x: "[-0.30,  0.85,  0.40 ]",
+      hPrev: "[ 0.54, -0.19,  0.10 ]",
+      hNew: "[ 0.22,  0.68,  0.46 ]",
+      svgX: '"cat"',
+      svgY: 'Top: "sat" (64%)',
+      activeNodes: ["node-cell", "node-h-new", "node-y"],
+      activeWires: ["wire-h-out", "wire-y-out"],
+      probs: [
+        { word: '"sat"', pct: 64 },
+        { word: '"ran"', pct: 24 },
+        { word: '"on"',  pct: 7 },
+        { word: '"cat"', pct: 5 }
+      ]
+    },
+    {
+      pill: "3A. Read 'sat'",
+      timeIndex: 3,
+      title: "Stage 3A (t = 3): Feed Word 3 ('sat') & Combine with h(2)",
+      desc: "Word 3 ('sat') enters as embedding x(3) and combines with memory h(2) ('the cat') inside the exact same RNN cell weights.",
+      token: '"sat" (ID: 29)',
+      x: "[ 0.15,  0.40, -0.75 ]",
+      hPrev: "[ 0.22,  0.68,  0.46 ]",
+      hNew: "Computing...",
+      svgX: '"sat"',
+      svgY: "Computing...",
+      activeNodes: ["node-x", "node-h-prev", "node-cell"],
+      activeWires: ["wire-x-in", "wire-h-in"],
+      probs: [
+        { word: '"sat"', pct: 64 },
+        { word: '"ran"', pct: 24 },
+        { word: '"on"',  pct: 7 },
+        { word: '"cat"', pct: 5 }
+      ]
+    },
+    {
+      pill: "3B. Final Prediction",
+      timeIndex: 3,
+      title: "Stage 3B (t = 3): Final Memory h(3) Predicts 'on' (78%)",
+      desc: "Hidden state h(3) now holds the context of the entire sequence ('the cat sat'). Passing h(3) to the output layer gives a 78% probability that the next word is 'on'!",
+      token: '"sat" (ID: 29)',
+      x: "[ 0.15,  0.40, -0.75 ]",
+      hPrev: "[ 0.22,  0.68,  0.46 ]",
+      hNew: "[ 0.35,  0.79, -0.32 ]",
+      svgX: '"sat"',
+      svgY: 'Top: "on" (78%)',
+      activeNodes: ["node-cell", "node-h-new", "node-y"],
+      activeWires: ["wire-h-out", "wire-y-out"],
+      probs: [
+        { word: '"on"',   pct: 78 },
+        { word: '"down"', pct: 14 },
+        { word: '"the"',  pct: 5 },
+        { word: '"cat"',  pct: 3 }
+      ]
+    }
+  ];
+
+  let currentStep = 0;
+
+  function initPills() {
+    const container = document.getElementById("pillContainer");
+    stages.forEach((s, idx) => {
+      const btn = document.createElement("div");
+      btn.className = "pill";
+      btn.innerText = s.pill;
+      btn.onclick = () => {
+        currentStep = idx;
+        render();
+      };
+      container.appendChild(btn);
+    });
+  }
+
+  function changeStep(delta) {
+    const next = currentStep + delta;
+    if (next >= 0 && next < stages.length) {
+      currentStep = next;
+      render();
+    }
+  }
+
+  function render() {
+    const s = stages[currentStep];
+
+    // Buttons state
+    document.getElementById("prevBtn").disabled = currentStep === 0;
+    document.getElementById("nextBtn").disabled = currentStep === stages.length - 1;
+
+    // Update pills
+    const pills = document.querySelectorAll(".pill");
+    pills.forEach((p, idx) => {
+      p.classList.toggle("active", idx === currentStep);
+    });
+
+    // Update timeline
+    for (let i = 0; i <= 3; i++) {
+      document.getElementById(`time-${i}`).classList.toggle("current", i === s.timeIndex);
+    }
+
+    // Update text and vectors
+    document.getElementById("token-badge").innerText = s.token;
+    document.getElementById("val-x").innerText = s.x;
+    document.getElementById("val-h-prev").innerText = s.hPrev;
+    document.getElementById("val-h-new").innerText = s.hNew;
+    document.getElementById("svg-x-label").textContent = s.svgX;
+    document.getElementById("svg-y-label").textContent = s.svgY;
+    document.getElementById("step-title").innerText = s.title;
+    document.getElementById("step-desc").innerText = s.desc;
+
+    // Reset SVG classes
+    const allNodes = ["node-x", "node-h-prev", "node-cell", "node-h-new", "node-y"];
+    allNodes.forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.remove("active-input", "active-memory", "active-cell", "active-output");
+    });
+
+    const allWires = ["wire-x-in", "wire-h-in", "wire-h-out", "wire-y-out"];
+    allWires.forEach(id => {
+      document.getElementById(id).classList.remove("wire-highlight");
+    });
+
+    // Apply active SVG highlights
+    s.activeNodes.forEach(id => {
+      const el = document.getElementById(id);
+      if (id === "node-x") el.classList.add("active-input");
+      if (id === "node-h-prev" || id === "node-h-new") el.classList.add("active-memory");
+      if (id === "node-cell") el.classList.add("active-cell");
+      if (id === "node-y") el.classList.add("active-output");
+    });
+
+    s.activeWires.forEach(id => {
+      document.getElementById(id).classList.add("wire-highlight");
+    });
+
+    // Render probability bars
+    const probContainer = document.getElementById("prob-bars");
+    probContainer.innerHTML = s.probs.map(p => `
+      <div class="prob-row">
+        <div class="prob-word">${p.word}</div>
+        <div class="prob-bar-bg">
+          <div class="prob-bar-fill" style="width: ${p.pct}%"></div>
+        </div>
+        <div class="prob-val">${p.pct}%</div>
+      </div>
+    `).join("");
+  }
+
+  initPills();
+  render();
+</script>
+</body>
+</html>
