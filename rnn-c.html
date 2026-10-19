@@ -27,14 +27,16 @@
   --pos:#3cc4a6; --neg:#f07a80; --ok:#5cc983; color-scheme:dark}
 
 *{box-sizing:border-box}
-html,body{margin:0;width:100%}
+html,body{margin:0;width:100%;height:100%;overflow:hidden}
 img{max-width:100%}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5}
-.wrap{width:100%;margin:0;padding:clamp(10px,2vw,20px);display:grid;gap:clamp(10px,1.6vw,16px)}
-header h1{font-family:var(--font-display);font-size:clamp(1.6rem,3.2vw,2.2rem);font-weight:700;letter-spacing:-.01em;margin:0;text-wrap:balance}
+/* the whole page is laid out at a fixed design width, then scaled to fit the frame (no inner scrollbar) */
+.wrap{position:absolute;top:0;left:0;transform-origin:0 0;margin:0;padding:18px;display:grid;gap:14px;align-content:start}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 22px}
+header h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;letter-spacing:-.01em;margin:0;text-wrap:balance}
 header p{margin:6px 0 0;color:var(--muted);max-width:68ch}
-.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:10px;font-size:.85rem;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;font-size:.85rem;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .sw{width:12px;height:12px;border-radius:3px;border:2px solid currentColor;display:inline-block}
 
@@ -54,8 +56,8 @@ select{font:inherit;color:var(--ink);background:var(--faint);border:1px solid va
 .track i.gap{flex:0 0 6px;background:none;cursor:default}
 
 /* diagram */
-.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
-.stage svg{display:block;min-width:600px;width:100%;height:auto}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stage svg{display:block;width:100%;max-width:840px;margin:0 auto;height:auto}
 svg text{font-family:var(--font-body);fill:var(--ink)}
 svg .mono{font-family:var(--font-mono)}
 svg .muted{fill:var(--muted)}
@@ -80,8 +82,9 @@ svg .muted{fill:var(--muted)}
 
 /* panels */
 .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:18px;align-items:start}
-@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 18px 20px;min-width:0}
+.wide .grid{align-items:stretch}
+.tall .grid{grid-template-columns:minmax(0,1fr)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;min-width:0}
 .tag{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .narr h2{font-family:var(--font-display);font-size:1.35rem;margin:6px 0 10px;line-height:1.25;text-wrap:balance}
 .narr p{margin:0 0 10px;max-width:62ch}
@@ -89,31 +92,36 @@ svg .muted{fill:var(--muted)}
 .w{font-family:var(--font-mono);font-size:.92em;background:var(--faint);border:1px solid var(--line);border-radius:5px;padding:0 5px;white-space:nowrap}
 .c-in{color:var(--input);font-weight:600}.c-h{color:var(--memory);font-weight:600}.c-out{color:var(--output);font-weight:600}
 
-.formula{font-family:var(--font-mono);font-size:.95rem;display:grid;gap:4px;padding:12px;background:var(--faint);border-radius:8px;overflow-x:auto;white-space:nowrap}
+.formula{font-family:var(--font-mono);font-size:.95rem;display:grid;gap:2px;padding:8px 12px;background:var(--faint);border-radius:8px;overflow-x:auto;white-space:nowrap}
 .formula .p{padding:1px 4px;border-radius:4px;transition:background .3s,color .3s}
 .formula .p.on{background:var(--ink);color:var(--surface)}
-.rows{display:grid;gap:12px;margin-top:14px}
-.row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;align-items:center;transition:opacity .3s}
+.rows{display:grid;gap:8px;margin-top:10px}
+.row{display:grid;grid-template-columns:185px minmax(0,1fr);gap:10px;align-items:center;transition:opacity .3s}
 .row.off{opacity:.3}
 .row.on .lab{color:var(--ink);font-weight:600}
 .row.on .lab::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--output);margin-right:6px;vertical-align:1px}
-.lab{font-size:.85rem;color:var(--muted);line-height:1.3}
+.lab{font-size:.8rem;color:var(--muted);line-height:1.2}
 .lab small{display:block;font-family:var(--font-mono);font-size:.78rem}
-@media (max-width:520px){.row{grid-template-columns:minmax(0,1fr)}.row .lab{margin-bottom:-6px}}
+
 .vec{display:flex;flex-wrap:wrap;gap:4px}
-.v{font-family:var(--font-mono);font-size:.8rem;min-width:54px;padding:5px 4px;text-align:center;border-radius:6px;border:1px solid var(--line);font-variant-numeric:tabular-nums;transition:background .4s}
+.v{font-family:var(--font-mono);font-size:.8rem;min-width:54px;padding:3px 4px;text-align:center;border-radius:6px;border:1px solid var(--line);font-variant-numeric:tabular-nums;transition:background .4s}
 .onehot .v{min-width:46px;display:grid;gap:2px}
 .onehot .v b{font-weight:600}
 .onehot .v small{font-family:var(--font-body);font-size:.7rem;color:var(--muted)}
 .onehot .v.hot{border-color:var(--input);background:color-mix(in srgb,var(--input) 22%,var(--surface))}
-.bars{display:grid;gap:4px}
+.bars{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 18px}
+.duo .bars{grid-template-columns:minmax(0,1fr)}
 .bar{display:grid;grid-template-columns:52px minmax(0,1fr) 48px;gap:8px;align-items:center;font-size:.82rem}
 .bar .t{height:12px;background:var(--faint);border-radius:3px;overflow:hidden}
 .bar .t i{display:block;height:100%;background:var(--output);border-radius:3px;transition:width .5s}
 .bar.top span:first-child{font-weight:700}
 .bar .n{font-family:var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
-.duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-@media (max-width:520px){.duo{grid-template-columns:minmax(0,1fr)}}
+.cmp{display:grid;grid-template-columns:52px minmax(0,1fr) minmax(0,1fr);gap:3px 14px;align-items:center;font-size:.82rem}
+.cmp h4{margin:0 0 2px;font-size:.78rem;font-weight:600}
+.cmp .top{font-weight:700}
+.cmp .bar{grid-template-columns:minmax(0,1fr) 40px}
+.cmp .alt .t i{background:var(--neg)}
+
 .duo h4{margin:0 0 6px;font-size:.82rem;font-weight:600}
 .duo .alt .bar .t i{background:var(--neg)}
 .kbd{font-family:var(--font-mono);font-size:.78rem;color:var(--muted)}
@@ -125,7 +133,6 @@ svg .muted{fill:var(--muted)}
 <div class="wrap">
   <header>
     <h1>RNN, Step by Step</h1>
-    <p>A tiny RNN reads <span class="w">May the force be with</span> one word at a time and guesses the next word after each one. Press Play to watch it run, or use Next and Back to go at your own pace.</p>
     <div class="legend" aria-hidden="true">
       <span style="color:var(--input)"><i class="sw"></i><span style="color:var(--muted)">input word xₜ</span></span>
       <span style="color:var(--memory)"><i class="sw"></i><span style="color:var(--muted)">hidden state hₜ (memory)</span></span>
@@ -207,6 +214,11 @@ function vec(arr,cls){return `<div class="vec ${cls||""}">`+arr.map(v=>`<span cl
 function onehot(x){return `<div class="vec onehot">`+x.map((v,i)=>`<span class="v ${v?"hot":""}"><b>${v}</b><small>${V[i]}</small></span>`).join("")+`</div>`;}
 function bars(p,limit){const order=p.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]);const top=order[0][1];
   return `<div class="bars">`+V.map((w,i)=>`<div class="bar ${i===top?"top":""}"><span>${w}</span><span class="t"><i style="width:${(p[i]*100).toFixed(1)}%"></i></span><span class="n">${pct(p[i])}</span></div>`).join("")+`</div>`;}
+function cmpBars(pa,pb){const ta=pa.indexOf(Math.max(...pa)),tb=pb.indexOf(Math.max(...pb));
+  return `<div class="cmp"><span></span><h4>with memory</h4><h4 class="alt">memory wiped (h${sub(4)} = 0)</h4>`+
+    V.map((w,i)=>`<span class="${i===ta||i===tb?"top":""}">${w}</span>
+      <span class="bar"><span class="t"><i style="width:${(pa[i]*100).toFixed(1)}%"></i></span><span class="n">${pct(pa[i])}</span></span>
+      <span class="bar alt"><span class="t"><i style="width:${(pb[i]*100).toFixed(1)}%"></i></span><span class="n">${pct(pb[i])}</span></span>`).join("")+`</div>`;}
 const dots=n=>`<div class="vec">`+Array.from({length:n},()=>`<span class="v">·</span>`).join("")+`</div>`;
 
 /* ---------- diagram ---------- */
@@ -263,7 +275,7 @@ function renderPanel(r,t,phase,mode){
   html+=row("h","New hidden state",`h${T1} = tanh(sum)`,show("h")?vec(r.h):dots(4),st("h"));
   if(mode==="nomem"){
     html+=row("y","Guess for the next word",`y${T1} = softmax(W_hy · h${T1})`,
-      `<div class="duo"><div><h4>with memory</h4>${bars(R[4].p)}</div><div class="alt"><h4>memory wiped (h${sub(4)} = 0)</h4>${bars(r.p)}</div></div>`,"on");
+      cmpBars(R[4].p,r.p),"on");
   } else {
     html+=row("y","Guess for the next word",`y${T1} = softmax(W_hy · h${T1})`,show("y")?bars(r.p):`<div class="kbd">not computed yet</div>`,st("y"));
   }
@@ -275,7 +287,8 @@ function renderPanel(r,t,phase,mode){
 /* ---------- narration ---------- */
 function narrate(step){
   if(step.kind==="intro") return {tag:"Overview",title:"One cell, used five times",body:
-    `<p>An RNN reads a sequence one element per time step. The diagram shows the same cell <b>unrolled</b> over five steps, one per word. Every column uses <b>the same weights</b> W<sub>xh</sub>, W<sub>hh</sub> and W<sub>hy</sub>.</p>
+    `<p>A tiny RNN reads ${W("May the force be with")} one word at a time and guesses the next word after each one. Press <b>Play</b> to watch it, or use <b>Next</b> and <b>Back</b> to go at your own pace.</p>
+     <p>An RNN reads a sequence one element per time step. The diagram shows the same cell <b>unrolled</b> over five steps, one per word. Every column uses <b>the same weights</b> W<sub>xh</sub>, W<sub>hh</sub> and W<sub>hy</sub>.</p>
      <p>Each step does three things: take the new word <span class="c-in">x<sub>t</sub></span>, mix it with the memory <span class="c-h">h<sub>t−1</sub></span> from the step before, and produce a guess <span class="c-out">y<sub>t</sub></span> for the next word.</p>
      <p>The memory starts empty: h${sub(0)} is all zeros. The goal is to see why the last guess is ${W("you")} and not ${W("me")}.</p>`};
   if(step.kind==="nomem"){const p=NOMEM.p;return {tag:"Memory test",title:"What if the memory is wiped?",body:
@@ -389,9 +402,38 @@ steps.forEach((s,k)=>{ if(k>0 && (s.kind!=="word" || s.s==="read")) th+=`<i clas
 track.innerHTML=th;
 track.querySelectorAll("i[data-s]").forEach(el=>el.addEventListener("click",()=>{stop();go(+el.dataset.s);}));
 
-buildSVG(); render();
-matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{buildSVG();render();});
-new MutationObserver(()=>{buildSVG();render();}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+/* ---------- fit the page into the frame ---------- */
+const app=document.querySelector(".wrap");
+const LAYOUTS={wide:1180,tall:760};   // design widths: side-by-side panels, or stacked panels
+let dims=null;
+function measureAll(){
+  const keep=cur; dims={};
+  app.style.transform="none";
+  for(const [name,W] of Object.entries(LAYOUTS)){
+    app.classList.remove("wide","tall"); app.classList.add(name);
+    app.style.width=W+"px"; app.style.height="auto";
+    let m=0; for(let i=0;i<steps.length;i++){cur=i;render();m=Math.max(m,app.offsetHeight);}
+    dims[name]={W,H:Math.ceil(m)};
+  }
+  cur=keep;
+}
+function fit(){
+  if(!dims) measureAll();
+  const vw=document.documentElement.clientWidth, vh=window.innerHeight;
+  let best=null;
+  for(const [name,d] of Object.entries(dims)){const sc=Math.min(vw/d.W,vh/d.H); if(!best||sc>best.sc) best={name,sc,...d};}
+  app.classList.remove("wide","tall"); app.classList.add(best.name);
+  app.style.width=best.W+"px"; app.style.height=best.H+"px";
+  app.style.left=Math.max(0,(vw-best.W*best.sc)/2)+"px";
+  app.style.transform=`scale(${best.sc})`;
+  render();
+}
+function refit(){dims=null;fit();}
+buildSVG(); fit();
+window.addEventListener("resize",fit);
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(refit);
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{buildSVG();refit();});
+new MutationObserver(()=>{buildSVG();refit();}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 })();
 </script>
 
