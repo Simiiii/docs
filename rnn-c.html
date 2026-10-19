@@ -27,12 +27,12 @@
   --pos:#3cc4a6; --neg:#f07a80; --ok:#5cc983; color-scheme:dark}
 
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden}
+html,body{margin:0;width:100%;overflow-x:hidden}
 img{max-width:100%}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5}
-/* the whole page is laid out at a fixed design width, then scaled to fit the frame (no inner scrollbar) */
-.wrap{position:absolute;top:0;left:0;transform-origin:0 0;margin:0;padding:18px;display:grid;gap:14px;align-content:start}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.5}
+/* real size (no zoom); the page keeps one fixed height for all steps so the embed never needs to scroll */
+.wrap{width:100%;margin:0;padding:clamp(10px,2vw,18px);display:grid;gap:14px;align-content:start}
 header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 22px}
 header h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;letter-spacing:-.01em;margin:0;text-wrap:balance}
 header p{margin:6px 0 0;color:var(--muted);max-width:68ch}
@@ -56,8 +56,8 @@ select{font:inherit;color:var(--ink);background:var(--faint);border:1px solid va
 .track i.gap{flex:0 0 6px;background:none;cursor:default}
 
 /* diagram */
-.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.stage svg{display:block;width:100%;max-width:840px;margin:0 auto;height:auto}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+.stage svg{display:block;width:100%;min-width:560px;max-width:900px;margin:0 auto;height:auto}
 svg text{font-family:var(--font-body);fill:var(--ink)}
 svg .mono{font-family:var(--font-mono)}
 svg .muted{fill:var(--muted)}
@@ -81,9 +81,8 @@ svg .muted{fill:var(--muted)}
 .colhit{fill:transparent;cursor:pointer}
 
 /* panels */
-.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:18px;align-items:start}
-.wide .grid{align-items:stretch}
-.tall .grid{grid-template-columns:minmax(0,1fr)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:14px;align-items:stretch}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;min-width:0}
 .tag{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .narr h2{font-family:var(--font-display);font-size:1.35rem;margin:6px 0 10px;line-height:1.25;text-wrap:balance}
@@ -111,6 +110,8 @@ svg .muted{fill:var(--muted)}
 .onehot .v.hot{border-color:var(--input);background:color-mix(in srgb,var(--input) 22%,var(--surface))}
 .bars{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 18px}
 .duo .bars{grid-template-columns:minmax(0,1fr)}
+@media (max-width:520px){.row{grid-template-columns:minmax(0,1fr)}.row .lab{margin-bottom:-4px}.bars{grid-template-columns:minmax(0,1fr)}}
+.hint{position:fixed;left:0;right:0;bottom:0;padding:6px 12px;font-size:.8rem;text-align:center;background:var(--ink);color:var(--surface)}
 .bar{display:grid;grid-template-columns:52px minmax(0,1fr) 48px;gap:8px;align-items:center;font-size:.82rem}
 .bar .t{height:12px;background:var(--faint);border-radius:3px;overflow:hidden}
 .bar .t i{display:block;height:100%;background:var(--output);border-radius:3px;transition:width .5s}
@@ -152,7 +153,7 @@ svg .muted{fill:var(--muted)}
     <div class="track" id="track"></div>
   </div>
 
-  <div class="stage"><svg id="svg" viewBox="0 0 1060 370" role="img" aria-label="Unrolled RNN with five time steps"></svg></div>
+  <div class="stage"><svg id="svg" viewBox="0 0 940 372" role="img" aria-label="Unrolled RNN with five time steps"></svg></div>
 
   <div class="grid">
     <section class="panel narr" aria-live="polite">
@@ -223,12 +224,12 @@ const dots=n=>`<div class="vec">`+Array.from({length:n},()=>`<span class="v">·<
 
 /* ---------- diagram ---------- */
 const svg=document.getElementById("svg");
-const X0=200, DX=192, BW=128;
+const X0=170, DX=172, BW=124;
 const cx=i=>X0+i*DX;
 function buildSVG(){
   let s=`<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${css("--muted")}"/></marker></defs>`;
-  s+=`<text x="60" y="186" text-anchor="middle" class="mono" font-size="15">h${sub(0)}</text><text x="60" y="206" text-anchor="middle" class="muted" font-size="12">= 0</text>`;
-  s+=`<path class="edge e-h" id="eh0" d="M86,180 L${cx(0)-BW/2-4},180" marker-end="url(#ah)"/>`;
+  s+=`<text x="44" y="186" text-anchor="middle" class="mono" font-size="18">h${sub(0)}</text><text x="44" y="208" text-anchor="middle" class="muted" font-size="14">= 0</text>`;
+  s+=`<path class="edge e-h" id="eh0" d="M66,180 L${cx(0)-BW/2-4},180" marker-end="url(#ah)"/>`;
   for(let i=0;i<T;i++){
     const x=cx(i);
     if(i<T-1) s+=`<path class="edge e-h" id="eh${i+1}" d="M${x+BW/2},180 L${cx(i+1)-BW/2-4},180" marker-end="url(#ah)"/>`;
@@ -236,15 +237,15 @@ function buildSVG(){
       <path class="edge e-in" id="ein${i}" d="M${x},288 L${x},228" marker-end="url(#ah)"/>
       <path class="edge e-out" id="eout${i}" d="M${x},132 L${x},90" marker-end="url(#ah)"/>
       <rect class="out box" x="${x-BW/2}" y="20" width="${BW}" height="66" rx="10"/>
-      <text x="${x}" y="40" text-anchor="middle" class="muted" font-size="12">y${sub(i+1)} · guess</text>
-      <text x="${x}" y="68" text-anchor="middle" font-size="19" font-weight="700" id="outw${i}">?</text>
+      <text x="${x}" y="40" text-anchor="middle" class="muted" font-size="14">y${sub(i+1)} · guess</text>
+      <text x="${x}" y="70" text-anchor="middle" font-size="21" font-weight="700" id="outw${i}">?</text>
       <rect class="cell box" x="${x-BW/2}" y="134" width="${BW}" height="92" rx="12"/>
-      <text x="${x}" y="158" text-anchor="middle" class="mono" font-size="15">h${sub(i+1)}</text>
+      <text x="${x}" y="160" text-anchor="middle" class="mono" font-size="18">h${sub(i+1)}</text>
       ${[0,1,2,3].map(j=>`<rect class="hcell" id="hc${i}_${j}" x="${x-50+j*26}" y="170" width="22" height="22" rx="4" fill="${css("--faint")}" stroke="${css("--line")}"/>`).join("")}
-      <text x="${x}" y="214" text-anchor="middle" class="muted" font-size="11">same weights W</text>
+      <text x="${x}" y="214" text-anchor="middle" class="muted" font-size="13">same weights W</text>
       <rect class="in box" x="${x-BW/2}" y="292" width="${BW}" height="48" rx="10"/>
-      <text x="${x}" y="322" text-anchor="middle" font-size="18" font-weight="600">${SENT[i]}</text>
-      <text x="${x}" y="360" text-anchor="middle" class="mono muted" font-size="13">x${sub(i+1)} · t=${i+1}</text>
+      <text x="${x}" y="323" text-anchor="middle" font-size="21" font-weight="600">${SENT[i]}</text>
+      <text x="${x}" y="362" text-anchor="middle" class="mono muted" font-size="15">x${sub(i+1)} · t=${i+1}</text>
       <rect class="colhit" x="${x-BW/2-20}" y="10" width="${BW+40}" height="355" data-col="${i}"/>
     </g>`;
   }
@@ -363,7 +364,7 @@ function render(){
   // keep the active column in view on narrow screens
   const stage=document.querySelector(".stage");
   if(stage.scrollWidth>stage.clientWidth){
-    const sc=svg.clientWidth/1060, focus=activeT>=0?cx(activeT):(step.kind==="intro"?0:cx(T-1));
+    const sc=svg.clientWidth/940, focus=activeT>=0?cx(activeT):(step.kind==="intro"?0:cx(T-1));
     const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
     stage.scrollTo({left:Math.max(0,focus*sc-stage.clientWidth/2),behavior:reduce?"auto":"smooth"});
   }
@@ -402,38 +403,25 @@ steps.forEach((s,k)=>{ if(k>0 && (s.kind!=="word" || s.s==="read")) th+=`<i clas
 track.innerHTML=th;
 track.querySelectorAll("i[data-s]").forEach(el=>el.addEventListener("click",()=>{stop();go(+el.dataset.s);}));
 
-/* ---------- fit the page into the frame ---------- */
+/* ---------- one stable height for every step (no zoom, no inner scrollbar) ---------- */
 const app=document.querySelector(".wrap");
-const LAYOUTS={wide:1180,tall:760};   // design widths: side-by-side panels, or stacked panels
-let dims=null;
-function measureAll(){
-  const keep=cur; dims={};
-  app.style.transform="none";
-  for(const [name,W] of Object.entries(LAYOUTS)){
-    app.classList.remove("wide","tall"); app.classList.add(name);
-    app.style.width=W+"px"; app.style.height="auto";
-    let m=0; for(let i=0;i<steps.length;i++){cur=i;render();m=Math.max(m,app.offsetHeight);}
-    dims[name]={W,H:Math.ceil(m)};
-  }
-  cur=keep;
+const hint=document.createElement("div"); hint.className="hint"; hint.hidden=true; document.body.appendChild(hint);
+let lastW=0;
+function stabilize(){
+  const keep=cur; app.style.minHeight="0px"; let m=0;
+  for(let i=0;i<steps.length;i++){cur=i;render();m=Math.max(m,app.offsetHeight);}
+  cur=keep; render(); app.style.minHeight=Math.ceil(m)+"px"; lastW=innerWidth; checkHint();
 }
-function fit(){
-  if(!dims) measureAll();
-  const vw=document.documentElement.clientWidth, vh=window.innerHeight;
-  let best=null;
-  for(const [name,d] of Object.entries(dims)){const sc=Math.min(vw/d.W,vh/d.H); if(!best||sc>best.sc) best={name,sc,...d};}
-  app.classList.remove("wide","tall"); app.classList.add(best.name);
-  app.style.width=best.W+"px"; app.style.height=best.H+"px";
-  app.style.left=Math.max(0,(vw-best.W*best.sc)/2)+"px";
-  app.style.transform=`scale(${best.sc})`;
-  render();
+function checkHint(){
+  const need=Math.ceil(app.offsetHeight);
+  hint.hidden = innerHeight >= need-2;
+  hint.textContent=`Drag the bottom edge of this block down to about ${need} px to see everything without scrolling.`;
 }
-function refit(){dims=null;fit();}
-buildSVG(); fit();
-window.addEventListener("resize",fit);
-if(document.fonts&&document.fonts.ready) document.fonts.ready.then(refit);
-matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{buildSVG();refit();});
-new MutationObserver(()=>{buildSVG();refit();}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+buildSVG(); stabilize();
+let rt; window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{innerWidth!==lastW?stabilize():checkHint();},150);});
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(stabilize);
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{buildSVG();stabilize();});
+new MutationObserver(()=>{buildSVG();stabilize();}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 })();
 </script>
 
