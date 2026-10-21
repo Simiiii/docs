@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Raw CBC-MAC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@75..150,400..900&family=JetBrains+Mono:wght@400;600;700&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+<style>
+/* Layout: one reading column of lab sections; wide circuit diagrams scroll inside their own frames.
+   Color: cobalt = chain value, amber = XOR, teal = block cipher, crimson = attacker. */
+:root{
+  --bg:#edf0f4; --surface:#ffffff; --surface-2:#f4f6f9; --ink:#132030; --muted:#5a6777; --line:#cbd3dd;
+  --wire:#7b8796; --chain:#2345cf; --chain-soft:#e2e8ff; --xor:#a86300; --xor-soft:#fcefd8;
+  --enc:#0b7863; --enc-soft:#daf2ec; --attack:#bf2659; --attack-soft:#fbe2ea; --ok:#13804a; --ok-soft:#dcf3e6;
+  --f-display:"Anybody","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d131a; --surface:#141c26; --surface-2:#1a2431; --ink:#e2e8f0; --muted:#97a4b4; --line:#2c3847;
+  --wire:#738192; --chain:#88a1ff; --chain-soft:#1c2852; --xor:#f0b445; --xor-soft:#3a2b0f;
+  --enc:#45c8a9; --enc-soft:#103a31; --attack:#ff6f9c; --attack-soft:#3f1527; --ok:#4fca8c; --ok-soft:#113726;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0d131a; --surface:#141c26; --surface-2:#1a2431; --ink:#e2e8f0; --muted:#97a4b4; --line:#2c3847;
+  --wire:#738192; --chain:#88a1ff; --chain-soft:#1c2852; --xor:#f0b445; --xor-soft:#3a2b0f;
+  --enc:#45c8a9; --enc-soft:#103a31; --attack:#ff6f9c; --attack-soft:#3f1527; --ok:#4fca8c; --ok-soft:#113726;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.6}
+.wrap{max-width:1060px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:44px 96px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:clamp(2.8rem,8vw,5rem);font-weight:850;font-stretch:135%;line-height:.95;letter-spacing:-.015em}
+h2{font-size:clamp(1.55rem,3.6vw,2.1rem);font-weight:760;font-stretch:118%;line-height:1.1}
+h3{font-size:1.15rem;font-weight:700;font-stretch:110%;line-height:1.25}
+p{margin:0;max-width:68ch}
+.eyebrow{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.lead{font-size:1.12rem;color:var(--ink)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono)}
+code,.code{font-family:var(--f-mono);font-size:.92em}
+header{display:grid;gap:16px}
+section{margin-top:72px;display:grid;gap:18px}
+.sec-head{display:grid;gap:8px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}
+.stack{display:grid;gap:12px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+/* key bar */
+.keybar{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+.keybar label{font-weight:600}
+.field{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=text]{font-family:var(--f-mono);font-size:15px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--ink);min-width:0}
+input[type=text]:focus-visible,.btn:focus-visible,button.bit:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--chain);outline-offset:2px}
+input.bad{border-color:var(--attack)}
+.btn{font:600 14px var(--f-body);padding:7px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--chain)}
+.btn.primary{background:var(--chain);border-color:var(--chain);color:var(--surface)}
+.btn:disabled{opacity:.4;cursor:default}
+
+/* chain diagram */
+svg.chain{display:block;max-width:none}
+svg.chain text{font-family:var(--f-mono);fill:var(--ink)}
+svg.chain .lbl{font-family:var(--f-body);font-size:11.5px;fill:var(--muted)}
+svg.chain .hex{font-size:15px;font-weight:700}
+svg.chain .hexs{font-size:12.5px;font-weight:700;fill:var(--chain)}
+svg.chain .small{font-size:11.5px;fill:var(--muted)}
+svg.chain .etext{font-size:13.5px;font-weight:700;fill:var(--enc)}
+svg.chain .hot{fill:var(--attack);font-weight:700}
+.box{fill:var(--surface);stroke:var(--ink);stroke-width:1.4}
+.mbox{fill:var(--surface-2)}
+.ivbox{fill:var(--surface-2);stroke:var(--wire)}
+.ebox{fill:var(--enc-soft);stroke:var(--enc)}
+.ebox2{fill:var(--enc-soft);stroke:var(--enc);stroke-width:2.4}
+.xorc{fill:var(--xor-soft);stroke:var(--xor);stroke-width:1.6}
+.xorx{stroke:var(--xor);stroke-width:1.6;fill:none}
+.tagbox{fill:var(--chain-soft);stroke:var(--chain);stroke-width:2}
+.wire{stroke:var(--wire);stroke-width:1.6;fill:none}
+.wire.chain{stroke:var(--chain)}
+.ah{fill:var(--wire)}
+svg.chain g{transition:opacity .3s ease}
+.g-todo{opacity:.22}
+.g-active .box,.g-active .xorc{stroke-width:3.2}
+.g-active .mbox{stroke:var(--chain)}
+.g-active .wire{stroke-width:3}
+.g-active .wire.chain{stroke:var(--chain)}
+.g-mark .mbox{stroke:var(--attack);fill:var(--attack-soft);stroke-width:2.4}
+.g-mark .lbl{fill:var(--attack)}
+.g-tagactive .tagbox{stroke-width:3.6}
+
+/* stepper */
+.stepper{display:grid;gap:14px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.controls input[type=range]{flex:1 1 180px;accent-color:var(--chain)}
+.stepcount{font-family:var(--f-mono);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.detail-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.detail-grid{grid-template-columns:minmax(0,1fr)}}
+.detail{display:grid;gap:12px;align-content:start}
+.phase{display:inline-block;font-family:var(--f-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:99px;border:1px solid currentColor;width:max-content}
+.phase.split{color:var(--muted)} .phase.xor{color:var(--xor)} .phase.enc{color:var(--enc)} .phase.final{color:var(--chain)}
+pre.algo{margin:0;font-family:var(--f-mono);font-size:13.5px;line-height:1.75;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 0;overflow-x:auto}
+pre.algo span{display:block;padding:0 14px;border-left:3px solid transparent;white-space:pre}
+pre.algo span.on{background:var(--chain-soft);border-left-color:var(--chain)}
+pre.algo .cm{color:var(--muted);display:inline;padding:0;border:0;background:none}
+
+/* bits */
+.bits{display:inline-flex;gap:2px;flex:none}
+.bit{width:15px;height:21px;display:inline-grid;place-items:center;font:600 11px/1 var(--f-mono);border-radius:3px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line);padding:0}
+.bit.b1{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.bit.g4{margin-right:6px}
+.bit.flip{box-shadow:0 0 0 2px var(--xor)}
+.bit.diff.b0{background:var(--attack-soft);color:var(--attack);border-color:var(--attack)}
+.bit.diff.b1{background:var(--attack);color:var(--surface);border-color:var(--attack)}
+.bit.eq{box-shadow:0 0 0 2px var(--ok)}
+button.bit{cursor:pointer}
+button.bit:hover{border-color:var(--attack)}
+.brow{display:grid;grid-template-columns:9.5rem max-content 3.6rem;gap:12px;align-items:center}
+.brow.res{border-top:1.5px solid var(--ink);padding-top:8px}
+.blabel{font-family:var(--f-mono);font-size:.85rem}
+.bhex{font-family:var(--f-mono);font-weight:700;font-size:.9rem}
+.brows{display:grid;gap:7px;width:max-content}
+@media (max-width:560px){
+  .brow{grid-template-columns:max-content max-content;row-gap:3px}
+  .blabel{grid-column:1/-1}
+  .bit{width:13px}
+}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-grid;justify-items:center;gap:1px;padding:5px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);font-family:var(--f-mono);font-size:.88rem}
+.chip small{font-family:var(--f-body);font-size:.7rem;color:var(--muted)}
+.chip b{font-weight:700}
+.chip.pad{border-style:dashed}
+.chip.atk{border-color:var(--attack);background:var(--attack-soft)}
+.chip.tag{border-color:var(--chain);background:var(--chain-soft)}
+
+/* verdicts */
+.verdict{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:8px;border:1px solid var(--attack);background:var(--attack-soft)}
+.verdict.ok{border-color:var(--ok);background:var(--ok-soft)}
+.verdict .vbadge{flex:none;font:700 .74rem var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:var(--attack);color:var(--surface)}
+.verdict.ok .vbadge{background:var(--ok)}
+.verdict p{max-width:none}
+
+/* tables */
+table{border-collapse:collapse;font-size:.95rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.cmp td:first-child{font-weight:600;white-space:nowrap}
+.cmp td:last-child{background:var(--chain-soft)}
+table.av td,table.av th{padding:7px 10px;white-space:nowrap}
+table.av td.ix{font-family:var(--f-mono);color:var(--muted)}
+.hbar{display:inline-block;position:relative;width:96px;height:10px;border-radius:5px;background:var(--surface-2);border:1px solid var(--line);vertical-align:middle;margin-right:8px;overflow:hidden}
+.hbar span{position:absolute;left:0;top:0;bottom:0;background:var(--attack)}
+.hbar i{position:absolute;left:50%;top:-2px;bottom:-2px;border-left:1.5px dashed var(--ink);opacity:.55}
+.hd{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:.85rem}
+
+.formula{font-family:var(--f-mono);font-size:clamp(.9rem,2.2vw,1.05rem);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px;overflow-x:auto;white-space:nowrap}
+.formula .k{color:var(--enc);font-weight:700}
+.formula .x{color:var(--xor);font-weight:700}
+.formula .t{color:var(--chain);font-weight:700}
+.badge-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--attack);color:var(--surface);font:700 .85rem var(--f-mono);flex:none}
+.ph{display:flex;gap:10px;align-items:center}
+ul.clean{margin:0;padding-left:1.1rem;display:grid;gap:8px;max-width:72ch}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.85rem;color:var(--muted)}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.note{font-size:.88rem;color:var(--muted)}
+dl.sum{display:grid;grid-template-columns:max-content 1fr;gap:10px 18px;margin:0}
+dl.sum dt{font-weight:700}
+dl.sum dd{margin:0;max-width:70ch}
+@media (max-width:620px){dl.sum{grid-template-columns:1fr}dl.sum dd{margin-bottom:8px}}
+@media (prefers-reduced-motion:reduce){svg.chain g{transition:none}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Advanced Cyber Security · Message authentication codes</div>
+  <h1>Raw CBC-MAC</h1>
+  <p class="lead">CBC-MAC turns a block cipher into a MAC by running CBC "encryption" with a fixed zero IV and keeping only the very last block. Step through it bit by bit below, then break it three different ways and see how ECBC-MAC and CMAC repair it.</p>
+  <div class="keybar">
+    <div class="field">
+      <label for="key">Secret key <span class="mono">k</span></label>
+      <input type="text" id="key" value="5EC12E7A" maxlength="8" size="10" spellcheck="false" aria-describedby="keyhelp">
+      <button class="btn" id="keyrand" type="button">New random key</button>
+    </div>
+    <p class="note" id="keyhelp">Every demo on this page uses this key. Toy block cipher <span class="mono">E(k,·)</span>: a 6-round Feistel network on 16-bit blocks (n = 16), so you can read every bit. It is a real permutation but far too small to be secure; real CBC-MAC uses AES with n = 128.</p>
+  </div>
+</header>
+
+<section id="construction">
+  <div class="sec-head">
+    <div class="eyebrow">Construction</div>
+    <h2>One key, a zero IV, and only the last block leaves the box</h2>
+  </div>
+  <p>Split the message into ℓ blocks of n bits, <span class="mono">m = m[0] ‖ m[1] ‖ … ‖ m[ℓ−1]</span>. Each block is XORed into a running chain value, and the result is encrypted. The tag is the final chain value:</p>
+  <div class="formula">t = <span class="k">E(k,</span> … <span class="k">E(k,</span> <span class="k">E(k,</span> <span class="k">E(k,</span> m[0]) <span class="x">⊕</span> m[1]) <span class="x">⊕</span> m[2]) … <span class="x">⊕</span> m[ℓ−1])</div>
+  <div class="panel scroll">
+    <table class="cmp">
+      <thead><tr><th></th><th>CBC encryption (lecture 4)</th><th>Raw CBC-MAC</th></tr></thead>
+      <tbody>
+        <tr><td>Goal</td><td>Confidentiality</td><td>Integrity and authenticity</td></tr>
+        <tr><td>IV</td><td>Random (or derived from a nonce), sent along</td><td>Fixed to 0ⁿ, never sent</td></tr>
+        <tr><td>Output</td><td>Every block c[0], …, c[ℓ−1]</td><td>Only the last chain value t</td></tr>
+        <tr><td>Randomized?</td><td>Yes</td><td>No: same m, same k always gives the same t</td></tr>
+        <tr><td>Message length</td><td>Any (with padding)</td><td>Secure only if all messages have the same fixed ℓ</td></tr>
+        <tr><td>Receiver</td><td>Decrypts with D(k,·)</td><td>Recomputes t from m and compares</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="step">
+  <div class="sec-head">
+    <div class="eyebrow">Step-through</div>
+    <h2>Compute a tag, one operation at a time</h2>
+    <p class="muted">Type a message, then use Next or Play. The diagram dims everything that has not been computed yet.</p>
+  </div>
+  <div class="stepper">
+    <div class="row">
+      <label for="stepmsg" style="font-weight:600">Message</label>
+      <input type="text" id="stepmsg" value="PAY BOB" maxlength="13" size="16" spellcheck="false">
+      <span class="note" id="stepblocksnote"></span>
+    </div>
+    <div class="panel scroll" id="stepdiagram" aria-live="polite"></div>
+    <div class="controls">
+      <button class="btn" type="button" id="prev">◀ Back</button>
+      <button class="btn primary" type="button" id="play">▶ Play</button>
+      <button class="btn" type="button" id="next">Next ▶</button>
+      <input type="range" id="steprange" min="0" max="1" value="0" aria-label="Step">
+      <span class="stepcount" id="stepcount"></span>
+    </div>
+    <div class="detail-grid">
+      <div class="panel detail" id="stepdetail"></div>
+      <div class="stack">
+        <pre class="algo" id="algo"></pre>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--chain)"></i>chain value t</span>
+          <span><i class="sw" style="background:var(--xor)"></i>XOR</span>
+          <span><i class="sw" style="background:var(--enc)"></i>block cipher</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="avalanche">
+  <div class="sec-head">
+    <div class="eyebrow">Chaining</div>
+    <h2>Flip one message bit and watch it reach the tag</h2>
+    <p>Click any bit of <span class="mono">m′</span> to flip it. Chain values before the first changed block stay identical; from that block on, each <span class="mono">t′[i]</span> looks like a fresh random value, differing from <span class="mono">t[i]</span> in about half of the 16 bits (dashed mark). This is why the tag depends on every block.</p>
+  </div>
+  <div class="row">
+    <label for="avmsg" style="font-weight:600">Message m</label>
+    <input type="text" id="avmsg" value="PAY BOB 100" maxlength="13" size="16" spellcheck="false">
+    <button class="btn" type="button" id="avreset">Clear flips</button>
+  </div>
+  <div class="panel scroll"><table class="av" id="avtable"></table></div>
+  <p id="avsummary" class="mono" style="font-size:.92rem"></p>
+</section>
+
+<section id="iv">
+  <div class="sec-head">
+    <div class="eyebrow">Attack 1 · Random IV</div>
+    <h2>Why the IV must be fixed to zero</h2>
+    <p>Suppose we copied CBC encryption and used a random IV, sending the tag as <span class="mono">(IV, t)</span>. The first cipher input is <span class="mono">IV ⊕ m[0]</span>. An attacker who flips the same bits Δ in both the IV and m[0] leaves that input unchanged, so the old t stays valid for a different message. Pick the new first block below.</p>
+  </div>
+  <div class="row">
+    <label for="ivmsg" style="font-weight:600">Sent message</label>
+    <input type="text" id="ivmsg" value="10 CHF TO BOB" maxlength="15" size="17" spellcheck="false">
+    <label for="ivtgt" style="font-weight:600">Attacker's first block</label>
+    <input type="text" id="ivtgt" value="90" maxlength="2" size="3" spellcheck="false">
+    <button class="btn" type="button" id="ivrand">New random IV</button>
+  </div>
+  <div class="grid2">
+    <div class="panel stack">
+      <h3>Sender (has k)</h3>
+      <div id="ivsender" class="stack"></div>
+    </div>
+    <div class="panel stack">
+      <h3 style="color:var(--attack)">Attacker (no k)</h3>
+      <div id="ivattacker" class="stack"></div>
+    </div>
+  </div>
+  <div class="panel scroll"><div class="brows" id="ivbits"></div></div>
+  <div id="ivverdict"></div>
+</section>
+
+<section id="extension">
+  <div class="sec-head">
+    <div class="eyebrow">Attack 2 · Variable length</div>
+    <h2>The one-query extension forgery</h2>
+    <p>Raw CBC-MAC is a secure PRF when every message has the same number of blocks ℓ. Allow messages of different lengths and it breaks with a single chosen-message query. Raw CBC-MAC works on whole blocks, so here m is exactly one 16-bit block (2 characters).</p>
+  </div>
+  <div class="row">
+    <label for="extmsg" style="font-weight:600">Queried block m</label>
+    <input type="text" id="extmsg" value="OK" maxlength="2" size="3" spellcheck="false">
+  </div>
+  <div class="grid2">
+    <div class="panel stack">
+      <div class="ph"><span class="badge-n">1</span><h3>Query the MAC oracle on m</h3></div>
+      <div class="scroll" id="ext1"></div>
+      <p class="note">The attacker learns <span class="mono">t = E(k, m)</span>.</p>
+    </div>
+    <div class="panel stack">
+      <div class="ph"><span class="badge-n">2</span><h3>Build m* = m ‖ (m ⊕ t)</h3></div>
+      <div class="scroll"><div class="brows" id="ext2"></div></div>
+      <p class="note">Only public values are used. m* was never queried.</p>
+    </div>
+  </div>
+  <div class="panel stack">
+    <div class="ph"><span class="badge-n">3</span><h3>The verifier recomputes the tag of m* with the secret key</h3></div>
+    <div class="scroll" id="ext3"></div>
+    <p>At block 1 the chain value t meets <span class="mono">m ⊕ t</span>: <span class="mono">t ⊕ (m ⊕ t) = m</span>. The cipher sees m a second time and outputs t again.</p>
+    <div id="extverdict"></div>
+  </div>
+</section>
+
+<section id="splice">
+  <div class="sec-head">
+    <div class="eyebrow">Attack 3 · General case</div>
+    <h2>Splice any two tagged messages</h2>
+    <p>Given two valid pairs <span class="mono">(m, t)</span> and <span class="mono">(m′, t′)</span>, the message <span class="mono">m ‖ (m′[0] ⊕ t) ‖ m′[1] ‖ … ‖ m′[ℓ′−1]</span> has tag <span class="mono">t′</span>. At the junction the chain value t cancels, and from there the computation is exactly the one for m′. The forgery even ends with m′'s padded last block, so 10* padding does not help.</p>
+  </div>
+  <div class="row">
+    <label for="spa" style="font-weight:600">m</label>
+    <input type="text" id="spa" value="HI" maxlength="6" size="8" spellcheck="false">
+    <label for="spb" style="font-weight:600">m′</label>
+    <input type="text" id="spb" value="PAY ME" maxlength="8" size="10" spellcheck="false">
+  </div>
+  <div class="grid2">
+    <div class="panel stack"><h3>Known tagged messages</h3><div id="spknown" class="stack"></div></div>
+    <div class="panel stack"><h3 style="color:var(--attack)">Forged message</h3><div id="spforged" class="stack"></div></div>
+  </div>
+  <div class="panel scroll" id="spdiagram"></div>
+  <div id="spverdict"></div>
+</section>
+
+<section id="fixes">
+  <div class="sec-head">
+    <div class="eyebrow">Repairs</div>
+    <h2>Making it safe for variable-length messages</h2>
+    <p>The attacks above all work because the tag of m is also the chain value in the middle of every longer message that starts with m. Each fix breaks that link.</p>
+  </div>
+  <div class="panel stack">
+    <h3>ECBC-MAC: encrypt the raw tag once more with an independent key k₁</h3>
+    <div class="scroll" id="ecbcdiagram"></div>
+    <p class="note">The attacker now only sees <span class="mono">E(k₁, t)</span>, never the chain value t itself, so the cancellation trick has nothing to cancel. Boneh's bound: for q tagged messages, Adv<sub>PRF</sub>[A, F<sub>ECBC</sub>] ≤ Adv<sub>PRP</sub>[B, E] + 2q²/|X|, with |X| = 2ⁿ. With AES this means rekeying after about 2⁴⁸ messages. (The diagram uses k₁ = k ⊕ 9E3779B9 for display only; a real k₁ is generated independently.)</p>
+  </div>
+  <div class="grid3">
+    <div class="panel stack">
+      <h3>Prepend the length</h3>
+      <p>Put the number of blocks ℓ into the first block, then run raw CBC-MAC. No valid message is now a prefix of another one. Secure, but the length must be known before processing starts. Appending the length at the end is not enough.</p>
+    </div>
+    <div class="panel stack">
+      <h3>CMAC (NIST SP 800-38B)</h3>
+      <p>The standardized variant. Derives two subkeys from k and XORs one of them into the last block before its encryption. One key, no extra cipher call, no dummy padding block. Use this in practice.</p>
+    </div>
+    <div class="panel stack">
+      <h3>Rules that still apply</h3>
+      <ul class="clean">
+        <li>Never reuse the same k for CBC encryption and CBC-MAC.</li>
+        <li>Never release intermediate chain values: t[i] is the tag of the prefix m[0..i].</li>
+        <li>Compare tags in constant time.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="summary">
+  <div class="sec-head">
+    <div class="eyebrow">Exam summary</div>
+    <h2>What to remember</h2>
+  </div>
+  <div class="panel">
+    <dl class="sum">
+      <dt>Definition</dt><dd><span class="mono">t ← 0ⁿ; for i = 0..ℓ−1: t ← E(k, t ⊕ m[i]); output t</span>. Verify by recomputing and comparing.</dd>
+      <dt>Secure when</dt><dd>All messages have the same fixed length ℓ: raw CBC-MAC is then a secure PRF on X^ℓ, hence a secure MAC (up to the birthday bound q ≪ 2^(n/2)).</dd>
+      <dt>Broken when</dt><dd>Lengths vary. One query on m gives t; then <span class="mono">m ‖ (m ⊕ t)</span> has tag t. In general <span class="mono">m ‖ (m′[0] ⊕ t) ‖ m′[1..]</span> has tag t′.</dd>
+      <dt>IV</dt><dd>Must be fixed (0ⁿ). A random IV sent with the tag lets the attacker change m[0] freely: <span class="mono">(IV ⊕ Δ, m[0] ⊕ Δ ‖ …)</span> keeps the tag.</dd>
+      <dt>Fixes</dt><dd>ECBC-MAC <span class="mono">E(k₁, rawCBC(k, m))</span>, length prepending, or CMAC (the standard).</dd>
+    </dl>
+  </div>
+</section>
+</div>
+
+<script>
+(() => {
+"use strict";
+// ---------- toy block cipher ----------
+const rotl8 = (x, s) => ((x << s) | (x >>> (8 - s))) & 255;
+const SBOX = (() => {
+  const s = new Uint8Array(256); let p = 1, q = 1;
+  do {
+    p = (p ^ ((p << 1) & 255) ^ ((p & 0x80) ? 0x1b : 0)) & 255;
+    q ^= q << 1; q ^= q << 2; q ^= q << 4; q &= 255; if (q & 0x80) q ^= 0x09;
+    s[p] = (q ^ rotl8(q, 1) ^ rotl8(q, 2) ^ rotl8(q, 3) ^ rotl8(q, 4) ^ 0x63) & 255;
+  } while (p !== 1);
+  s[0] = 0x63; return s;
+})();
+function E(k, x) {
+  let L = (x >>> 8) & 255, R = x & 255;
+  for (let r = 0; r < 6; r++) {
+    const kb = (k >>> (8 * (r & 3))) & 255;
+    const f = SBOX[(R ^ kb ^ (r * 0x1d)) & 255];
+    const g = rotl8(f, 3) ^ SBOX[(f + kb + r) & 255];
+    const nl = R; R = (L ^ g) & 255; L = nl;
+  }
+  return ((L << 8) | R) & 0xffff;
+}
+let KEY = 0x5EC12E7A;
+const K1 = () => (KEY ^ 0x9E3779B9) >>> 0;
+function cbc(k, blocks, iv = 0) {
+  let t = iv; const ins = [], outs = [];
+  for (const m of blocks) { const x = t ^ m; ins.push(x); t = E(k, x); outs.push(t); }
+  return { ins, outs, tag: t };
+}
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const h4 = x => (x & 0xffff).toString(16).toUpperCase().padStart(4, "0");
+const pop = x => { let c = 0; while (x) { c += x & 1; x >>>= 1; } return c; };
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ch = b => (b >= 32 && b < 127) ? String.fromCharCode(b) : "·";
+const asc = x => ch(x >>> 8) + ch(x & 255);
+const clean = s => Array.from(s).filter(c => { const n = c.charCodeAt(0); return n >= 32 && n < 127; }).join("");
+function encode(text) {
+  const b = Array.from(clean(text)).map(c => c.charCodeAt(0));
+  b.push(0x80); if (b.length % 2) b.push(0);
+  const out = []; for (let i = 0; i < b.length; i += 2) out.push((b[i] << 8) | b[i + 1]);
+  return out;
+}
+function oneBlock(text) { const s = (clean(text) + "  ").slice(0, 2); return (s.charCodeAt(0) << 8) | s.charCodeAt(1); }
+function decode(blocks) {
+  const b = []; blocks.forEach(x => b.push(x >>> 8, x & 255));
+  while (b.length && b[b.length - 1] === 0) b.pop();
+  if (b.length && b[b.length - 1] === 0x80) b.pop();
+  return b.map(ch).join("");
+}
+function bits(x, o = {}) {
+  let h = '<span class="bits" aria-hidden="true">';
+  for (let b = 15; b >= 0; b--) {
+    const v = (x >> b) & 1; let c = "bit b" + v;
+    if (o.diff !== undefined && (((o.diff ^ x) >> b) & 1)) c += " diff";
+    if (o.flip !== undefined && ((o.flip >> b) & 1)) c += " flip";
+    if (o.eq) c += " eq";
+    if (b % 4 === 0 && b) c += " g4";
+    h += `<span class="${c}">${v}</span>`;
+  }
+  return h + "</span>";
+}
+function brow(label, x, o = {}) {
+  return `<div class="brow${o.cls ? " " + o.cls : ""}"><span class="blabel">${label}</span>${bits(x, o)}<span class="bhex">${h4(x)}</span></div>`;
+}
+function chip(label, x, cls = "") {
+  return `<span class="chip ${cls}"><small>${label}</small><b>${h4(x)}</b><small>"${esc(asc(x))}"</small></span>`;
+}
+
+// ---------- chain diagram ----------
+let svgN = 0;
+function chainSVG(o) {
+  const blocks = o.blocks, n = blocks.length, colW = 136, x0 = 152;
+  const iv = o.iv || 0, r = cbc(KEY, blocks, iv), st = o.stage || null, ecbc = !!o.ecbc;
+  const tagVal = ecbc ? E(K1(), r.tag) : r.tag;
+  const cx = i => x0 + i * colW;
+  const W = cx(n - 1) + 92, H = ecbc ? 338 : 290;
+  const p = "cm" + (++svgN), arrow = `marker-end="url(#${p})"`;
+  const S = (i, part) => {
+    if (!st) return "done";
+    const ph = st.phase;
+    if (part === "iv") return ph === "split" ? "todo" : (ph === "xor" && st.i === 0 ? "active" : "done");
+    if (ph === "split") return part === "m" ? "active" : "todo";
+    if (ph === "final") return part === "tag" ? "active" : "done";
+    if (part === "m") return (i === st.i && ph === "xor") ? "active" : "done";
+    if (i < st.i) return (part === "out" && i === st.i - 1 && ph === "xor") ? "active" : "done";
+    if (i > st.i) return "todo";
+    if (part === "xor") return ph === "xor" ? "active" : "done";
+    if (part === "enc" || part === "out") return ph === "enc" ? "active" : "todo";
+    return "todo";
+  };
+  const val = (s, x) => s === "todo" ? "····" : h4(x);
+  let s = `<svg class="chain" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria || "CBC-MAC computation diagram")}"><defs><marker id="${p}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ah"/></marker></defs>`;
+  const ivS = S(0, "iv");
+  s += `<g class="g-${ivS}"><text class="lbl" x="57" y="88" text-anchor="middle">${o.ivLabel || "IV = 0ⁿ"}</text><rect class="box ivbox" x="22" y="96" width="70" height="32" rx="6"/><text class="hex" x="57" y="117" text-anchor="middle">${h4(iv)}</text><path class="wire chain" d="M92,112 H${cx(0) - 16}" ${arrow}/></g>`;
+  for (let i = 0; i < n; i++) {
+    const c = cx(i), mS = S(i, "m"), xS = S(i, "xor"), eS = S(i, "enc"), oS = S(i, "out");
+    const mark = o.mark && o.mark[i] ? " g-mark" : "";
+    const lab = (o.labels && o.labels[i]) || `m[${i}]`;
+    s += `<g class="g-${mS}${mark}"><text class="lbl" x="${c}" y="18" text-anchor="middle">${esc(lab)}</text><rect class="box mbox" x="${c - 48}" y="26" width="96" height="46" rx="6"/><text class="hex" x="${c}" y="49" text-anchor="middle">${h4(blocks[i])}</text><text class="small" x="${c}" y="65" text-anchor="middle">"${esc(asc(blocks[i]))}"</text><path class="wire" d="M${c},72 V96" ${arrow}/></g>`;
+    const hot = o.hotIns && o.hotIns[i] ? " hot" : "";
+    s += `<g class="g-${xS}"><circle class="xorc" cx="${c}" cy="112" r="14"/><path class="xorx" d="M${c - 14},112 H${c + 14} M${c},98 V126"/><path class="wire" d="M${c},126 V148" ${arrow}/><text class="small${hot}" x="${c + 8}" y="142">${val(xS, r.ins[i])}</text></g>`;
+    s += `<g class="g-${eS}"><rect class="box ebox" x="${c - 48}" y="150" width="96" height="44" rx="6"/><text class="etext" x="${c}" y="177" text-anchor="middle">E(k, ·)</text></g>`;
+    if (i < n - 1) {
+      const mx = c + colW * 0.5;
+      s += `<g class="g-${oS}"><path class="wire chain" d="M${c},194 V226 H${mx} V112 H${cx(i + 1) - 16}" ${arrow}/><text x="${c + 6}" y="248"><tspan class="lbl">t[${i}]</tspan> <tspan class="hexs">${val(oS, r.outs[i])}</tspan></text></g>`;
+    } else if (!ecbc) {
+      const tS = S(i, "tag");
+      s += `<g class="g-${oS}"><path class="wire chain" d="M${c},194 V232" ${arrow}/></g><g class="g-${tS}${tS === "active" ? " g-tagactive" : ""}"><rect class="box tagbox" x="${c - 54}" y="236" width="108" height="46" rx="6"/><text class="lbl" x="${c}" y="252" text-anchor="middle">tag t = t[${i}]</text><text class="hex" x="${c}" y="273" text-anchor="middle">${val(tS, tagVal)}</text></g>`;
+    } else {
+      s += `<g class="g-done"><path class="wire chain" d="M${c},194 V214" ${arrow}/><text x="${c + 6}" y="208"><tspan class="lbl">t[${i}]</tspan> <tspan class="hexs">${h4(r.tag)}</tspan></text><rect class="box ebox2" x="${c - 48}" y="216" width="96" height="44" rx="6"/><text class="etext" x="${c}" y="243" text-anchor="middle">E(k₁, ·)</text><path class="wire chain" d="M${c},260 V282" ${arrow}/><rect class="box tagbox" x="${c - 54}" y="284" width="108" height="46" rx="6"/><text class="lbl" x="${c}" y="300" text-anchor="middle">tag t</text><text class="hex" x="${c}" y="321" text-anchor="middle">${h4(tagVal)}</text></g>`;
+    }
+  }
+  return s + "</svg>";
+}
+
+// ---------- key ----------
+const keyIn = $("#key");
+keyIn.addEventListener("input", () => {
+  const v = keyIn.value.trim();
+  if (/^[0-9a-fA-F]{1,8}$/.test(v)) { keyIn.classList.remove("bad"); KEY = parseInt(v, 16) >>> 0; renderAll(); }
+  else keyIn.classList.add("bad");
+});
+$("#keyrand").addEventListener("click", () => {
+  let k; try { k = crypto.getRandomValues(new Uint32Array(1))[0]; } catch (e) { k = (Math.random() * 2 ** 32) >>> 0; }
+  KEY = k >>> 0; keyIn.value = KEY.toString(16).toUpperCase().padStart(8, "0"); keyIn.classList.remove("bad"); renderAll();
+});
+
+// ---------- step-through ----------
+let stepBlocks = [], steps = [], cur = 0, timer = null;
+const ALGO = [
+  "rawCBC(k, m[0], …, m[ℓ−1]):",
+  "  t ← 0ⁿ",
+  "  for i = 0, …, ℓ−1:",
+  "    x ← t ⊕ m[i]",
+  "    t ← E(k, x)",
+  "  return t"
+];
+function buildSteps() {
+  stepBlocks = encode($("#stepmsg").value);
+  steps = [{ phase: "split" }];
+  stepBlocks.forEach((_, i) => { steps.push({ i, phase: "xor" }, { i, phase: "enc" }); });
+  steps.push({ phase: "final" });
+  cur = Math.min(cur, steps.length - 1);
+  const rg = $("#steprange"); rg.max = steps.length - 1;
+  $("#stepblocksnote").textContent = `${stepBlocks.length} blocks of 16 bits (ℓ = ${stepBlocks.length})`;
+}
+function renderStep() {
+  const st = steps[cur], r = cbc(KEY, stepBlocks, 0), n = stepBlocks.length;
+  $("#stepdiagram").innerHTML = chainSVG({ blocks: stepBlocks, stage: st, aria: "Raw CBC-MAC step-through diagram" });
+  $("#steprange").value = cur;
+  $("#stepcount").textContent = `step ${cur + 1} / ${steps.length}`;
+  $("#prev").disabled = cur === 0; $("#next").disabled = cur === steps.length - 1;
+  let html = "", on = [];
+  const ann = {};
+  if (st.phase === "split") {
+    on = [0];
+    html = `<span class="phase split">Encode</span><h3>Cut the message into 16-bit blocks</h3>
+      <p>Raw CBC-MAC only accepts whole blocks. The text is turned into bytes and padded with <span class="mono">0x80</span> followed by zeros (10* padding), giving ℓ = ${n} blocks. Padding is an encoding step in front of raw CBC-MAC, not part of it.</p>
+      <div class="chips">${stepBlocks.map((b, i) => chip(`m[${i}]`, b, i === n - 1 ? "pad" : "")).join("")}</div>
+      <p class="note">Dashed block holds the padding; "·" marks a non-printable byte.</p>`;
+  } else if (st.phase === "xor") {
+    const i = st.i, prev = i ? r.outs[i - 1] : 0;
+    on = [2, 3]; ann[2] = `i = ${i}`; ann[3] = `x = ${h4(r.ins[i])}`;
+    html = `<span class="phase xor">XOR · block ${i}</span><h3>Mix m[${i}] into the chain value</h3>
+      <p>${i ? `The previous output t[${i - 1}] is XORed with the next message block.` : `The chain starts at the fixed IV 0ⁿ, so the first cipher input is just m[0].`} Every 1-bit in m[${i}] flips the chain bit above it (outlined).</p>
+      <div class="scroll"><div class="brows">
+        ${brow(i ? `t[${i - 1}]` : "IV = 0ⁿ", prev)}
+        ${brow(`⊕ m[${i}]`, stepBlocks[i])}
+        ${brow(`= x`, r.ins[i], { cls: "res", flip: stepBlocks[i] })}
+      </div></div>`;
+  } else if (st.phase === "enc") {
+    const i = st.i, d = pop(r.ins[i] ^ r.outs[i]);
+    on = [4]; ann[4] = `t = ${h4(r.outs[i])}`;
+    html = `<span class="phase enc">Encrypt · block ${i}</span><h3>Apply the block cipher E(k,·)</h3>
+      <p>E(k,·) is a pseudorandom permutation: without k its output looks like a uniformly random 16-bit value. ${d} of 16 bits changed here. The result becomes the new chain value t[${i}].${i < n - 1 ? " It stays inside the MAC and is never sent." : ""}</p>
+      <div class="scroll"><div class="brows">
+        ${brow("x", r.ins[i])}
+        ${brow(`t[${i}] = E(k, x)`, r.outs[i], { cls: "res", diff: r.ins[i] })}
+      </div></div>
+      <p class="note">Highlighted bits differ from x.</p>`;
+  } else {
+    on = [5]; ann[5] = `= ${h4(r.tag)}`;
+    html = `<span class="phase final">Output</span><h3>Release only the last chain value</h3>
+      <p>The tag is <span class="mono">t = t[${n - 1}] = ${h4(r.tag)}</span>. The sender transmits <span class="mono">(m, t)</span>; the receiver recomputes the chain with k and accepts only if its value matches.</p>
+      <div class="scroll"><div class="brows">${brow("tag t", r.tag)}</div></div>
+      <p class="note">Unlike CBC encryption, t[0], …, t[${n - 2}] are never published. Each t[i] is the raw CBC-MAC of the prefix m[0..i], so leaking them would hand out tags for free.</p>`;
+  }
+  $("#stepdetail").innerHTML = html;
+  $("#algo").innerHTML = ALGO.map((l, j) => `<span class="${on.includes(j) ? "on" : ""}">${esc(l)}${ann[j] ? `   <span class="cm">// ${esc(ann[j])}</span>` : ""}</span>`).join("");
+}
+function go(d) { cur = Math.max(0, Math.min(steps.length - 1, cur + d)); renderStep(); }
+function stopPlay() { if (timer) { clearInterval(timer); timer = null; } $("#play").textContent = "▶ Play"; }
+$("#prev").addEventListener("click", () => { stopPlay(); go(-1); });
+$("#next").addEventListener("click", () => { stopPlay(); go(1); });
+$("#steprange").addEventListener("input", e => { stopPlay(); cur = +e.target.value; renderStep(); });
+$("#play").addEventListener("click", () => {
+  if (timer) { stopPlay(); return; }
+  if (cur === steps.length - 1) cur = 0;
+  $("#play").textContent = "❚❚ Pause"; renderStep();
+  timer = setInterval(() => { if (cur >= steps.length - 1) { stopPlay(); return; } go(1); }, 1500);
+});
+$("#stepmsg").addEventListener("input", () => { stopPlay(); buildSteps(); renderStep(); });
+$("#step").addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" && e.target.type === "text") return;
+  if (e.key === "ArrowRight") { stopPlay(); go(1); e.preventDefault(); }
+  if (e.key === "ArrowLeft") { stopPlay(); go(-1); e.preventDefault(); }
+});
+
+// ---------- avalanche ----------
+let flips = new Set(["2:0"]);
+function renderAval() {
+  const m = encode($("#avmsg").value);
+  flips = new Set([...flips].filter(f => +f.split(":")[0] < m.length));
+  const m2 = m.map((b, i) => { let x = b; for (let k = 0; k < 16; k++) if (flips.has(i + ":" + k)) x ^= 1 << k; return x; });
+  const r = cbc(KEY, m, 0), r2 = cbc(KEY, m2, 0);
+  let h = `<thead><tr><th>i</th><th>m′[i] (click to flip)</th><th>t[i] original</th><th>t′[i] after flip</th><th>bits changed</th></tr></thead><tbody>`;
+  m.forEach((b, i) => {
+    let btns = '<span class="bits">';
+    for (let k = 15; k >= 0; k--) {
+      const v = (m2[i] >> k) & 1; let c = "bit b" + v;
+      if (((b ^ m2[i]) >> k) & 1) c += " diff";
+      if (k % 4 === 0 && k) c += " g4";
+      btns += `<button type="button" class="${c}" data-blk="${i}" data-bit="${k}" aria-label="Flip bit ${k} of block ${i}">${v}</button>`;
+    }
+    btns += "</span>";
+    const hd = pop(r.outs[i] ^ r2.outs[i]);
+    h += `<tr><td class="ix">${i}</td><td>${btns} <span class="mono note">"${esc(asc(m2[i]))}"</span></td><td>${bits(r.outs[i])}</td><td>${bits(r2.outs[i], { diff: r.outs[i] })}</td><td><span class="hbar"><span style="width:${hd / 16 * 100}%"></span><i></i></span><span class="hd">${String(hd).padStart(2, " ")}/16</span></td></tr>`;
+  });
+  h += "</tbody>";
+  $("#avtable").innerHTML = h;
+  const first = m.findIndex((b, i) => b !== m2[i]);
+  const nf = [...flips].length;
+  const tagHD = pop(r.tag ^ r2.tag);
+  $("#avsummary").textContent = nf === 0
+    ? "No bits flipped: m′ = m, so every chain value and the tag are identical."
+    : `${nf} bit${nf > 1 ? "s" : ""} flipped, first in block ${first}. t[0..${first - 1 < 0 ? "" : first - 1}] unchanged${first === 0 ? " (none)" : ""}; tag ${h4(r.tag)} → ${h4(r2.tag)} (${tagHD} of 16 bits differ).`;
+}
+$("#avtable").addEventListener("click", e => {
+  const b = e.target.closest("button.bit"); if (!b) return;
+  const key = b.dataset.blk + ":" + b.dataset.bit;
+  flips.has(key) ? flips.delete(key) : flips.add(key);
+  renderAval();
+  const again = $(`#avtable button[data-blk="${b.dataset.blk}"][data-bit="${b.dataset.bit}"]`); if (again) again.focus();
+});
+$("#avmsg").addEventListener("input", renderAval);
+$("#avreset").addEventListener("click", () => { flips.clear(); renderAval(); });
+
+// ---------- random IV attack ----------
+let IV = 0xB37C;
+function renderIV() {
+  const m = encode($("#ivmsg").value);
+  const tgt = oneBlock($("#ivtgt").value || "  ");
+  const D = m[0] ^ tgt, IV2 = IV ^ D, m2 = [tgt, ...m.slice(1)];
+  const t = cbc(KEY, m, IV).tag, t2 = cbc(KEY, m2, IV2).tag;
+  $("#ivsender").innerHTML = `<p>Message <b class="mono">"${esc(decode(m))}"</b></p>
+    <div class="chips">${chip("IV (random)", IV)}${chip("m[0]", m[0])}<span class="chip tag"><small>tag t</small><b>${h4(t)}</b><small>with k</small></span></div>
+    <p class="note">Sends (IV, m, t).</p>`;
+  $("#ivattacker").innerHTML = `<p>Message <b class="mono" style="color:var(--attack)">"${esc(decode(m2))}"</b></p>
+    <div class="chips">${chip("Δ = m[0] ⊕ m′[0]", D, "atk")}${chip("IV′ = IV ⊕ Δ", IV2, "atk")}${chip("m′[0]", tgt, "atk")}<span class="chip tag"><small>tag (copied)</small><b>${h4(t)}</b><small>no k needed</small></span></div>
+    <p class="note">Sends (IV′, m′, t). Blocks m[1..] are untouched.</p>`;
+  const x = IV ^ m[0], x2 = IV2 ^ tgt;
+  $("#ivbits").innerHTML = `${brow("IV", IV)}${brow("⊕ m[0]", m[0])}${brow("= cipher input", x, { cls: "res", eq: x === x2 })}
+    <div style="height:10px"></div>
+    ${brow("IV′ = IV ⊕ Δ", IV2, { diff: IV })}${brow("⊕ m′[0]", tgt, { diff: m[0] })}${brow("= cipher input", x2, { cls: "res", eq: x === x2 })}`;
+  const okF = t2 === t;
+  $("#ivverdict").innerHTML = `<div class="verdict${okF ? "" : " ok"}"><span class="vbadge">${okF ? "Forgery accepted" : "Rejected"}</span><p>Verifier recomputes the tag on (IV′, m′) and gets <b class="mono">${h4(t2)}</b>, ${okF ? `equal to the original t = <b class="mono">${h4(t)}</b>. The Δ cancels inside the first XOR, so everything after it is identical. Fix: the IV is fixed to 0ⁿ and not under the attacker's control.` : "which differs from t."}</p></div>`;
+}
+["#ivmsg", "#ivtgt"].forEach(s => $(s).addEventListener("input", renderIV));
+$("#ivrand").addEventListener("click", () => { try { IV = crypto.getRandomValues(new Uint16Array(1))[0]; } catch (e) { IV = (Math.random() * 65536) | 0; } renderIV(); });
+
+// ---------- extension forgery ----------
+function renderExt() {
+  const m = oneBlock($("#extmsg").value), t = E(KEY, m), m1 = m ^ t, forged = [m, m1];
+  const tf = cbc(KEY, forged).tag;
+  $("#ext1").innerHTML = chainSVG({ blocks: [m], labels: ["m"], aria: "Oracle computes tag of m" });
+  $("#ext2").innerHTML = `${brow("m", m)}${brow("⊕ t", t)}${brow("= m ⊕ t", m1, { cls: "res" })}`;
+  $("#ext3").innerHTML = chainSVG({ blocks: forged, labels: ["m*[0] = m", "m*[1] = m ⊕ t"], mark: { 1: true }, hotIns: { 1: true }, aria: "Verifier computes tag of the forged message" });
+  const ok = tf === t;
+  $("#extverdict").innerHTML = `<div class="verdict${ok ? "" : " ok"}"><span class="vbadge">${ok ? "Forgery accepted" : "Rejected"}</span><p>Verify(k, m*, t): recomputed tag <b class="mono">${h4(tf)}</b> ${ok ? "=" : "≠"} t = <b class="mono">${h4(t)}</b>. Highlighted cipher input of block 1 is <b class="mono">${h4(m)}</b>, which equals m.</p></div>`;
+}
+$("#extmsg").addEventListener("input", renderExt);
+
+// ---------- splice ----------
+function renderSplice() {
+  const a = encode($("#spa").value), b = encode($("#spb").value);
+  const ta = cbc(KEY, a).tag, tb = cbc(KEY, b).tag;
+  const forged = [...a, b[0] ^ ta, ...b.slice(1)], tf = cbc(KEY, forged).tag;
+  const labels = [...a.map((_, i) => `m[${i}]`), "m′[0] ⊕ t", ...b.slice(1).map((_, j) => `m′[${j + 1}]`)];
+  $("#spknown").innerHTML = `<div><p class="mono">m = "${esc(decode(a))}"</p><div class="chips">${a.map((x, i) => chip(`m[${i}]`, x)).join("")}<span class="chip tag"><small>tag t</small><b>${h4(ta)}</b></span></div></div>
+    <div><p class="mono">m′ = "${esc(decode(b))}"</p><div class="chips">${b.map((x, i) => chip(`m′[${i}]`, x)).join("")}<span class="chip tag"><small>tag t′</small><b>${h4(tb)}</b></span></div></div>`;
+  $("#spforged").innerHTML = `<div class="chips">${forged.map((x, i) => chip(labels[i], x, i === a.length ? "atk" : "")).join("")}</div>
+    <p class="note">${forged.length} blocks. Claimed tag: t′ = <b class="mono">${h4(tb)}</b>. The red block is gibberish, but a MAC must reject every message nobody tagged.</p>`;
+  $("#spdiagram").innerHTML = chainSVG({ blocks: forged, labels, mark: { [a.length]: true }, hotIns: { [a.length]: true }, aria: "Verifier computes tag of spliced message" });
+  const ok = tf === tb;
+  $("#spverdict").innerHTML = `<div class="verdict${ok ? "" : " ok"}"><span class="vbadge">${ok ? "Forgery accepted" : "Rejected"}</span><p>Recomputed tag <b class="mono">${h4(tf)}</b> ${ok ? "=" : "≠"} t′ = <b class="mono">${h4(tb)}</b>. At block ${a.length} the cipher input is t ⊕ (m′[0] ⊕ t) = m′[0] = <b class="mono">${h4(b[0])}</b>.</p></div>`;
+}
+["#spa", "#spb"].forEach(s => $(s).addEventListener("input", renderSplice));
+
+function renderECBC() { $("#ecbcdiagram").innerHTML = chainSVG({ blocks: encode("PAY BOB"), ecbc: true, aria: "ECBC-MAC diagram" }); }
+
+function renderAll() { renderStep(); renderAval(); renderIV(); renderExt(); renderSplice(); renderECBC(); }
+buildSteps(); cur = 0; renderAll();
+})();
+</script>
+
+</body>
+</html>
