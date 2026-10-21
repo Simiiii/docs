@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-</head>
-<body>
 <title>Raw CBC-MAC</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,7 +15,7 @@
 :root{
   --bg:#edf0f4; --surface:#ffffff; --surface-2:#f4f6f9; --ink:#132030; --muted:#5a6777; --line:#cbd3dd;
   --wire:#7b8796; --chain:#2345cf; --chain-soft:#e2e8ff; --xor:#a86300; --xor-soft:#fcefd8;
-  --enc:#0b7863; --enc-soft:#daf2ec; --attack:#bf2659; --attack-soft:#fbe2ea; --ok:#13804a; --ok-soft:#dcf3e6;
+  --enc:#0b7863; --enc-soft:#daf2ec; --attack:#bf2659; --attack-soft:#fbe2ea; --ok:#13804a; --ok-soft:#dcf3e6; --page:#ffffff;
   --f-display:"Anybody","Arial Narrow",system-ui,sans-serif;
   --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -25,13 +23,13 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0d131a; --surface:#141c26; --surface-2:#1a2431; --ink:#e2e8f0; --muted:#97a4b4; --line:#2c3847;
   --wire:#738192; --chain:#88a1ff; --chain-soft:#1c2852; --xor:#f0b445; --xor-soft:#3a2b0f;
-  --enc:#45c8a9; --enc-soft:#103a31; --attack:#ff6f9c; --attack-soft:#3f1527; --ok:#4fca8c; --ok-soft:#113726;
+  --enc:#45c8a9; --enc-soft:#103a31; --attack:#ff6f9c; --attack-soft:#3f1527; --ok:#4fca8c; --ok-soft:#113726; --page:#191919;
   color-scheme:dark;
 }}
 :root[data-theme="dark"]{
   --bg:#0d131a; --surface:#141c26; --surface-2:#1a2431; --ink:#e2e8f0; --muted:#97a4b4; --line:#2c3847;
   --wire:#738192; --chain:#88a1ff; --chain-soft:#1c2852; --xor:#f0b445; --xor-soft:#3a2b0f;
-  --enc:#45c8a9; --enc-soft:#103a31; --attack:#ff6f9c; --attack-soft:#3f1527; --ok:#4fca8c; --ok-soft:#113726;
+  --enc:#45c8a9; --enc-soft:#103a31; --attack:#ff6f9c; --attack-soft:#3f1527; --ok:#4fca8c; --ok-soft:#113726; --page:#191919;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -158,7 +156,7 @@ th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);verti
 th{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .cmp td:first-child{font-weight:600;white-space:nowrap}
 .cmp td:last-child{background:var(--chain-soft)}
-table.av td,table.av th{padding:7px 10px;white-space:nowrap}
+table.av td,table.av th{padding:7px 6px;white-space:nowrap}
 table.av td.ix{font-family:var(--f-mono);color:var(--muted)}
 .hbar{display:inline-block;position:relative;width:96px;height:10px;border-radius:5px;background:var(--surface-2);border:1px solid var(--line);vertical-align:middle;margin-right:8px;overflow:hidden}
 .hbar span{position:absolute;left:0;top:0;bottom:0;background:var(--attack)}
@@ -180,8 +178,28 @@ dl.sum{display:grid;grid-template-columns:max-content 1fr;gap:10px 18px;margin:0
 dl.sum dt{font-weight:700}
 dl.sum dd{margin:0;max-width:70ch}
 @media (max-width:620px){dl.sum{grid-template-columns:1fr}dl.sum dd{margin-bottom:8px}}
+table.av .bit{width:12px;height:19px;font-size:10px}
+table.av .bit.g4{margin-right:5px}
+.tstack{display:grid;gap:4px}
+.tstack div{display:flex;gap:8px;align-items:center}
+.tstack em{font-style:normal;font-family:var(--f-mono);font-size:.8rem;color:var(--muted);width:1.1rem}
+td.ix small{display:block;font-size:.72rem}
+.hd.hot{color:var(--attack);font-weight:700}
+/* embed mode: inside a Notion (or any) iframe */
+html.embed,html.embed body{scrollbar-width:none}
+html.embed::-webkit-scrollbar,html.embed body::-webkit-scrollbar,html.embed .scroll::-webkit-scrollbar,html.embed pre.algo::-webkit-scrollbar,html.embed .formula::-webkit-scrollbar{display:none}
+html.embed .scroll,html.embed pre.algo,html.embed .formula{scrollbar-width:none}
+html.embed body{background:var(--page)}
+html.embed .wrap{max-width:none;padding-block:6px 28px;padding-left:max(6px,env(safe-area-inset-left,0px));padding-right:max(6px,env(safe-area-inset-right,0px))}
+html.embed h1{font-size:clamp(2rem,6vw,3.2rem)}
+html.embed section{margin-top:52px}
+html.embed .panel{padding:14px}
+html.embed .formula{font-size:.88rem}
 @media (prefers-reduced-motion:reduce){svg.chain g{transition:none}}
 </style>
+<script>try{if(window.self!==window.top||/[?&]embed/.test(location.search))document.documentElement.classList.add("embed")}catch(e){document.documentElement.classList.add("embed")}</script>
+</head>
+<body>
 
 <div class="wrap">
 <header>
@@ -258,7 +276,7 @@ dl.sum dd{margin:0;max-width:70ch}
   <div class="sec-head">
     <div class="eyebrow">Chaining</div>
     <h2>Flip one message bit and watch it reach the tag</h2>
-    <p>Click any bit of <span class="mono">m′</span> to flip it. Chain values before the first changed block stay identical; from that block on, each <span class="mono">t′[i]</span> looks like a fresh random value, differing from <span class="mono">t[i]</span> in about half of the 16 bits (dashed mark). This is why the tag depends on every block.</p>
+    <p>Click any bit of <span class="mono">m′</span> to flip it. Chain values before the first changed block stay identical; from that block on, each <span class="mono">t′[i]</span> looks like a fresh random value, differing from <span class="mono">t[i]</span> in about half of the 16 bits. This is why the tag depends on every block.</p>
   </div>
   <div class="row">
     <label for="avmsg" style="font-weight:600">Message m</label>
@@ -489,7 +507,7 @@ function chainSVG(o) {
     return "todo";
   };
   const val = (s, x) => s === "todo" ? "····" : h4(x);
-  let s = `<svg class="chain" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.aria || "CBC-MAC computation diagram")}"><defs><marker id="${p}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ah"/></marker></defs>`;
+  let s = `<svg class="chain" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;max-width:${W}px;min-width:${Math.min(W, Math.round(W * 0.6))}px" role="img" aria-label="${esc(o.aria || "CBC-MAC computation diagram")}"><defs><marker id="${p}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ah"/></marker></defs>`;
   const ivS = S(0, "iv");
   s += `<g class="g-${ivS}"><text class="lbl" x="57" y="88" text-anchor="middle">${o.ivLabel || "IV = 0ⁿ"}</text><rect class="box ivbox" x="22" y="96" width="70" height="32" rx="6"/><text class="hex" x="57" y="117" text-anchor="middle">${h4(iv)}</text><path class="wire chain" d="M92,112 H${cx(0) - 16}" ${arrow}/></g>`;
   for (let i = 0; i < n; i++) {
@@ -613,7 +631,7 @@ function renderAval() {
   flips = new Set([...flips].filter(f => +f.split(":")[0] < m.length));
   const m2 = m.map((b, i) => { let x = b; for (let k = 0; k < 16; k++) if (flips.has(i + ":" + k)) x ^= 1 << k; return x; });
   const r = cbc(KEY, m, 0), r2 = cbc(KEY, m2, 0);
-  let h = `<thead><tr><th>i</th><th>m′[i] (click to flip)</th><th>t[i] original</th><th>t′[i] after flip</th><th>bits changed</th></tr></thead><tbody>`;
+  let h = `<thead><tr><th>i</th><th>m′[i] (click to flip)</th><th>chain value: original t, after flip t′</th><th>changed</th></tr></thead><tbody>`;
   m.forEach((b, i) => {
     let btns = '<span class="bits">';
     for (let k = 15; k >= 0; k--) {
@@ -624,7 +642,7 @@ function renderAval() {
     }
     btns += "</span>";
     const hd = pop(r.outs[i] ^ r2.outs[i]);
-    h += `<tr><td class="ix">${i}</td><td>${btns} <span class="mono note">"${esc(asc(m2[i]))}"</span></td><td>${bits(r.outs[i])}</td><td>${bits(r2.outs[i], { diff: r.outs[i] })}</td><td><span class="hbar"><span style="width:${hd / 16 * 100}%"></span><i></i></span><span class="hd">${String(hd).padStart(2, " ")}/16</span></td></tr>`;
+    h += `<tr><td class="ix">${i}<small>"${esc(asc(m2[i]))}"</small></td><td>${btns}</td><td><div class="tstack"><div><em>t</em>${bits(r.outs[i])}</div><div><em>t′</em>${bits(r2.outs[i], { diff: r.outs[i] })}</div></div></td><td><span class="hd${hd ? " hot" : ""}">${hd}/16</span></td></tr>`;
   });
   h += "</tbody>";
   $("#avtable").innerHTML = h;
